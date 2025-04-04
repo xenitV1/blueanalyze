@@ -9,6 +9,7 @@ import {
 
 import type { Route } from "./+types/root";
 import "./app.css";
+import { LanguageProvider } from './contexts/LanguageContext';
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -25,14 +26,16 @@ export const links: Route.LinksFunction = () => [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className="h-full">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f3f4f6" />
+        <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1f2937" />
         <Meta />
         <Links />
       </head>
-      <body>
+      <body className="h-full bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white">
         {children}
         <ScrollRestoration />
         <Scripts />
@@ -42,7 +45,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  return <Outlet />;
+  return (
+    <LanguageProvider>
+      <Outlet />
+    </LanguageProvider>
+  );
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
