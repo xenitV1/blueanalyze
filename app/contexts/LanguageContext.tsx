@@ -37,6 +37,19 @@ export interface Translations {
   whatIsAppPassword: string;
   hideAppPasswordInfo: string;
   
+  // Target Follow
+  targetFollow: string;
+  targetFollowDescription: string;
+  searchUser: string;
+  followFollowers: string;
+  followFollowing: string;
+  enterUsername: string;
+  userNotFound: string;
+  requiresPassword: string;
+  processing: string;
+  operationComplete: string;
+  newSearch: string;
+  
   // Feedback
   feedbackTitle: string;
   feedbackIntro: string;
@@ -103,6 +116,19 @@ const enTranslations: Translations = {
   whatIsAppPassword: 'What is an App Password?',
   hideAppPasswordInfo: 'Hide App Password info',
   
+  // Target Follow
+  targetFollow: 'Target Based Follow',
+  targetFollowDescription: 'You can batch follow the followers or following of a specific Bluesky user.',
+  searchUser: 'Search',
+  followFollowers: 'Follow Followers',
+  followFollowing: 'Follow Following',
+  enterUsername: 'Bluesky username',
+  userNotFound: 'User not found',
+  requiresPassword: 'Password required',
+  processing: 'Processing...',
+  operationComplete: 'Operation Complete',
+  newSearch: 'New Search',
+  
   // Feedback
   feedbackTitle: 'Send Feedback',
   feedbackIntro: 'We\'d love to hear your thoughts about the BlueAnalyze tool!',
@@ -168,6 +194,19 @@ const trTranslations: Translations = {
   unfollowAllNonFollowers: 'Takip Etmeyenleri Takipten Çık',
   whatIsAppPassword: 'App Password nedir?',
   hideAppPasswordInfo: 'App Password bilgisini gizle',
+  
+  // Target Follow
+  targetFollow: 'Hedef Bazlı Takip',
+  targetFollowDescription: 'Belirli bir Bluesky kullanıcısının takipçilerini veya takip ettiklerini toplu olarak takip edebilirsiniz.',
+  searchUser: 'Ara',
+  followFollowers: 'Takipçileri Takip Et',
+  followFollowing: 'Takip Ettiklerini Takip Et',
+  enterUsername: 'Bluesky kullanıcı adı',
+  userNotFound: 'Kullanıcı bulunamadı',
+  requiresPassword: 'Şifre gerekli',
+  processing: 'İşlem Devam Ediyor',
+  operationComplete: 'İşlem Tamamlandı',
+  newSearch: 'Yeni Arama',
   
   // Feedback
   feedbackTitle: 'Geri Bildirim Gönder',

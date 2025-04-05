@@ -5,16 +5,17 @@ import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Card from '../ui/Card';
 import UserListItem from '../ui/UserListItem';
-import { FiUser, FiUserCheck, FiUserMinus, FiUserPlus, FiX, FiAlertTriangle, FiExternalLink, FiInfo, FiCheck, FiUsers, FiMessageSquare } from 'react-icons/fi';
+import { FiUser, FiUserCheck, FiUserMinus, FiUserPlus, FiX, FiAlertTriangle, FiExternalLink, FiInfo, FiCheck, FiUsers, FiMessageSquare, FiTarget } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import { useLanguage } from '../../contexts/LanguageContext';
+import TargetFollow from './TargetFollow';
 
 const FollowerAnalysis: React.FC = () => {
   const [username, setUsername] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [followersData, setFollowersData] = useState<FollowerAnalysisResult | null>(null);
-  const [activeTab, setActiveTab] = useState<'notFollowingBack' | 'notFollowedBack' | 'mutuals'>('notFollowingBack');
+  const [activeTab, setActiveTab] = useState<'notFollowingBack' | 'notFollowedBack' | 'mutuals' | 'targetFollow'>('notFollowingBack');
   const [showUnfollowModal, setShowUnfollowModal] = useState(false);
   const [showFollowModal, setShowFollowModal] = useState(false);
   const [password, setPassword] = useState('');
@@ -193,7 +194,11 @@ const FollowerAnalysis: React.FC = () => {
   };
 
   const handleBatchUnfollow = async () => {
-    if (!password) {
+    // Önce aktif oturum var mı kontrol et
+    const validSession = await validateSession();
+    
+    // Eğer aktif oturum yoksa ve şifre girilmemişse hata göster
+    if (!validSession && !password) {
       setUnfollowError(t.passwordRequired);
       return;
     }
@@ -210,10 +215,11 @@ const FollowerAnalysis: React.FC = () => {
     setUnfollowProgress({ completed: 0, total: followersData.notFollowingBack.length });
 
     try {
-      const unfollowResult = await batchUnfollowUsers(
+      const unfollowResult = await batchUnfollowUsersWithProgress(
         username,
-        password,
+        validSession ? null : password,
         followersData.notFollowingBack,
+        0,
         (completed, total, lastError) => {
           setUnfollowProgress({ completed, total });
           if (lastError) {
@@ -1106,6 +1112,18 @@ const FollowerAnalysis: React.FC = () => {
                       <FiUserCheck className="mr-2" />
                       <span>{t.mutuals} ({followersData.mutuals.length})</span>
                     </button>
+                    
+                    <button
+                      className={`py-2 px-4 mr-2 flex items-center ${
+                        activeTab === 'targetFollow'
+                          ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
+                          : 'text-gray-600 dark:text-gray-400'
+                      }`}
+                      onClick={() => setActiveTab('targetFollow')}
+                    >
+                      <FiTarget className="mr-2" />
+                      <span>{t.targetFollow}</span>
+                    </button>
                   </div>
                 </div>
 
@@ -1152,6 +1170,7 @@ const FollowerAnalysis: React.FC = () => {
                 {activeTab === 'notFollowingBack' && renderUserList(followersData.notFollowingBack)}
                 {activeTab === 'notFollowedBack' && renderUserList(followersData.notFollowedBack)}
                 {activeTab === 'mutuals' && renderUserList(followersData.mutuals)}
+                {activeTab === 'targetFollow' && <TargetFollow />}
               </Card>
             </motion.div>
           )}
@@ -1216,22 +1235,39 @@ const FollowerAnalysis: React.FC = () => {
                     </p>
                   </div>
                 ) : (
-                  <div className="flex items-center space-x-4">
-                    <Button
-                      variant="secondary"
-                      className="flex-1"
-                      onClick={() => setShowUnfollowModal(false)}
-                    >
-                      {language === 'TR' ? 'İptal' : 'Cancel'}
-                    </Button>
-                    <Button
-                      onClick={handleBatchUnfollow}
-                      variant="danger"
-                      className="flex-1"
-                      isLoading={unfollowInProgress}
-                    >
-                      {language === 'TR' ? 'Tümünü Takipten Çık' : 'Unfollow All'}
-                    </Button>
+                  <div className="flex flex-col space-y-4">
+                    {/* Şifre girişi sadece oturum yoksa gösterilsin */}
+                    {!getSession() && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          {t.blueskyPassword}
+                        </label>
+                        <Input
+                          type="password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="App Password"
+                        />
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center space-x-4">
+                      <Button
+                        variant="secondary"
+                        className="flex-1"
+                        onClick={() => setShowUnfollowModal(false)}
+                      >
+                        {language === 'TR' ? 'İptal' : 'Cancel'}
+                      </Button>
+                      <Button
+                        onClick={handleBatchUnfollow}
+                        variant="danger"
+                        className="flex-1"
+                        isLoading={unfollowInProgress}
+                      >
+                        {language === 'TR' ? 'Tümünü Takipten Çık' : 'Unfollow All'}
+                      </Button>
+                    </div>
                   </div>
                 )}
 

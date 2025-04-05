@@ -229,6 +229,7 @@ const FOLLOWERS_ENDPOINT = '/xrpc/app.bsky.graph.getFollowers';
 const FOLLOWING_ENDPOINT = '/xrpc/app.bsky.graph.getFollows';
 const CREATE_SESSION_ENDPOINT = '/xrpc/com.atproto.server.createSession';
 const UNFOLLOW_ENDPOINT = '/xrpc/app.bsky.graph.unfollow';
+const SEARCH_USERS_ENDPOINT = '/xrpc/app.bsky.actor.searchActors'; // Kullanıcı arama endpoint'i
 
 // Types
 export interface BlueSkyUser {
@@ -238,6 +239,8 @@ export interface BlueSkyUser {
   avatar?: string;
   description?: string;
   indexedAt?: string;
+  followersCount?: number;
+  followsCount?: number;
 }
 
 export interface FollowersResponse {
@@ -532,14 +535,29 @@ export const unfollowUser = async (token: string, userDid: string): Promise<{suc
  */
 export const batchUnfollowUsersWithProgress = async (
   handle: string, 
-  password: string, 
+  password: string | null, 
   users: BlueSkyUser[], 
   startIndex: number = 0,
   onProgress?: (completed: number, total: number, lastError?: DebugInfo) => void
 ): Promise<{success: number, failed: number, errors: DebugInfo[], lastProcessedIndex: number}> => {
   try {
     // First authenticate
-    const authResponse = await authenticateUser(handle, password);
+    let authResponse;
+    // Eğer şifre verilmediyse mevcut oturumu kullan
+    if (!password) {
+      const session = await validateSession();
+      if (!session) {
+        throw new Error('No active session and no password provided');
+      }
+      authResponse = {
+        accessJwt: session.accessJwt,
+        did: session.did,
+        handle: handle
+      };
+    } else {
+      authResponse = await authenticateUser(handle, password);
+    }
+    
     console.log('Authentication successful', authResponse.handle);
     
     let successCount = 0;
@@ -665,14 +683,29 @@ export const batchUnfollowUsersWithProgress = async (
  */
 export const batchFollowUsersWithProgress = async (
   handle: string, 
-  password: string, 
+  password: string | null, 
   users: BlueSkyUser[], 
   startIndex: number = 0,
   onProgress?: (completed: number, total: number, lastError?: DebugInfo) => void
 ): Promise<{success: number, failed: number, errors: DebugInfo[], lastProcessedIndex: number}> => {
   try {
     // First authenticate
-    const authResponse = await authenticateUser(handle, password);
+    let authResponse;
+    // Eğer şifre verilmediyse mevcut oturumu kullan
+    if (!password) {
+      const session = await validateSession();
+      if (!session) {
+        throw new Error('No active session and no password provided');
+      }
+      authResponse = {
+        accessJwt: session.accessJwt,
+        did: session.did,
+        handle: handle
+      };
+    } else {
+      authResponse = await authenticateUser(handle, password);
+    }
+    
     console.log('Authentication successful', authResponse.handle);
     
     let successCount = 0;
@@ -1273,5 +1306,173 @@ export const batchFollowUsers = async (
   } catch (error) {
     console.error('Error in batch follow operation:', error);
     throw error;
+  }
+};
+
+/**
+ * Kullanıcı arama fonksiyonu
+ * @param query Aranacak kullanıcı adı
+ * @param limit Döndürülecek sonuç sayısı
+ * @returns Kullanıcı arama sonuçları
+ */
+export const searchUsers = async (query: string, limit: number = 1): Promise<BlueSkyUser[]> => {
+  try {
+    // Önce mevcut oturum var mı kontrol et
+    const session = await validateSession();
+    
+    const params = new URLSearchParams({
+      q: query,
+      limit: limit.toString()
+    });
+    
+    // API çağrısını yap
+    const response = await axios.get(`${BASE_URL}${SEARCH_USERS_ENDPOINT}?${params.toString()}`, {
+      headers: session ? {
+        'Authorization': `Bearer ${session.accessJwt}`
+      } : {}
+    });
+    
+    // Sonuçları dönüştür
+    if (response.data && response.data.actors) {
+      return response.data.actors.map((user: any) => ({
+        did: user.did,
+        handle: user.handle,
+        displayName: user.displayName || user.handle,
+        avatar: user.avatar,
+        description: user.description,
+        indexedAt: user.indexedAt,
+        followersCount: user.followersCount || 0,
+        followsCount: user.followsCount || 0
+      }));
+    }
+    
+    return [];
+  } catch (error) {
+    console.error('Kullanıcı arama hatası:', error);
+    throw new Error('Failed to search users');
+  }
+};
+
+/**
+ * Belirli bir kullanıcının takipçilerini getirir
+ * @param targetDid Hedef kullanıcının DID'si
+ * @param maxCount İstenen maksimum kullanıcı sayısı (varsayılan: 100)
+ * @returns Takipçi listesi
+ */
+export const getUserFollowers = async (targetDid: string, maxCount: number = 100): Promise<BlueSkyUser[]> => {
+  try {
+    const session = await validateSession();
+    const allFollowers: BlueSkyUser[] = [];
+    let cursor: string | undefined = undefined;
+    
+    // Bluesky API bir seferde maksimum 100 kullanıcı döndürür
+    const perPageLimit = 100;
+    
+    // Maksimum 10000 kullanıcı getirme limiti
+    const safeMaxCount = Math.min(maxCount, 10000);
+    
+    do {
+      const params = new URLSearchParams({
+        actor: targetDid,
+        limit: perPageLimit.toString()
+      });
+      
+      if (cursor) {
+        params.append('cursor', cursor);
+      }
+      
+      console.log(`Fetching followers page: ${allFollowers.length}/${safeMaxCount}`);
+      
+      try {
+        const response = await axios.get(`${BASE_URL}${FOLLOWERS_ENDPOINT}?${params.toString()}`, {
+          headers: session ? {
+            'Authorization': `Bearer ${session.accessJwt}`
+          } : {}
+        });
+        
+        if (response.data && response.data.followers) {
+          allFollowers.push(...response.data.followers);
+          cursor = response.data.cursor;
+        } else {
+          cursor = undefined;
+        }
+        
+        // API rate limit koruması - her sayfa arasında kısa bir bekleme
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+      } catch (error) {
+        console.error('Followers page fetch error:', error);
+        // Hata durumunda döngüyü sonlandır
+        break;
+      }
+    } while (cursor && allFollowers.length < safeMaxCount);
+    
+    console.log(`Total followers fetched: ${allFollowers.length}`);
+    return allFollowers;
+  } catch (error) {
+    console.error('Kullanıcı takipçilerini getirme hatası:', error);
+    throw new Error('Failed to get user followers');
+  }
+};
+
+/**
+ * Belirli bir kullanıcının takip ettiklerini getirir
+ * @param targetDid Hedef kullanıcının DID'si
+ * @param maxCount İstenen maksimum kullanıcı sayısı (varsayılan: 100)
+ * @returns Takip edilen kullanıcı listesi
+ */
+export const getUserFollowing = async (targetDid: string, maxCount: number = 100): Promise<BlueSkyUser[]> => {
+  try {
+    const session = await validateSession();
+    const allFollowing: BlueSkyUser[] = [];
+    let cursor: string | undefined = undefined;
+    
+    // Bluesky API bir seferde maksimum 100 kullanıcı döndürür
+    const perPageLimit = 100;
+    
+    // Maksimum 10000 kullanıcı getirme limiti
+    const safeMaxCount = Math.min(maxCount, 10000);
+    
+    do {
+      const params = new URLSearchParams({
+        actor: targetDid,
+        limit: perPageLimit.toString()
+      });
+      
+      if (cursor) {
+        params.append('cursor', cursor);
+      }
+      
+      console.log(`Fetching following page: ${allFollowing.length}/${safeMaxCount}`);
+      
+      try {
+        const response = await axios.get(`${BASE_URL}${FOLLOWING_ENDPOINT}?${params.toString()}`, {
+          headers: session ? {
+            'Authorization': `Bearer ${session.accessJwt}`
+          } : {}
+        });
+        
+        if (response.data && response.data.follows) {
+          allFollowing.push(...response.data.follows);
+          cursor = response.data.cursor;
+        } else {
+          cursor = undefined;
+        }
+        
+        // API rate limit koruması - her sayfa arasında kısa bir bekleme
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+      } catch (error) {
+        console.error('Following page fetch error:', error);
+        // Hata durumunda döngüyü sonlandır
+        break;
+      }
+    } while (cursor && allFollowing.length < safeMaxCount);
+    
+    console.log(`Total following fetched: ${allFollowing.length}`);
+    return allFollowing;
+  } catch (error) {
+    console.error('Kullanıcı takip ettiklerini getirme hatası:', error);
+    throw new Error('Failed to get user following');
   }
 }; 
