@@ -80,7 +80,7 @@ const enTranslations: Translations = {
   // Follower Analysis
   appTitle: 'BlueAnalyze',
   blueskyUsername: 'Bluesky Username',
-  blueskyPassword: 'Bluesky Password or App Password',
+  blueskyPassword: 'App Password',
   analyze: 'Analyze',
   loading: 'Loading...',
   followers: 'Followers',
@@ -146,7 +146,7 @@ const trTranslations: Translations = {
   // Follower Analysis
   appTitle: 'BlueAnalyze',
   blueskyUsername: 'Bluesky Kullanıcı Adı',
-  blueskyPassword: 'Bluesky Şifresi veya App Password',
+  blueskyPassword: 'App Password',
   analyze: 'Analiz Et',
   loading: 'Yükleniyor...',
   followers: 'Takipçiler',
