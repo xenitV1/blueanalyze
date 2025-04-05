@@ -35,6 +35,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f3f4f6" />
         <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1f2937" />
+        {/* SEO Meta Tags */}
+        <title>BlueAnalyze - Bluesky Follower Analytics Tool</title>
+        <meta name="description" content="Analyze your Bluesky followers and following relationships. Track mutual followers, find non-followers and manage your Bluesky social network with BlueAnalyze." />
+        <meta name="keywords" content="bluesky, bluesky analytics, follower analysis, social media, blue analyze, bluesky followers" />
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://blue-analyze.com/" />
+        <meta property="og:title" content="BlueAnalyze - Bluesky Follower Analytics Tool" />
+        <meta property="og:description" content="Analyze your Bluesky followers and following relationships. Track mutual followers, find non-followers and manage your Bluesky social network." />
+        <meta property="og:image" content="https://blue-analyze.com/blueanalyze.png" />
+        {/* Twitter */}
+        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="twitter:url" content="https://blue-analyze.com/" />
+        <meta property="twitter:title" content="BlueAnalyze - Bluesky Follower Analytics Tool" />
+        <meta property="twitter:description" content="Analyze your Bluesky followers and following relationships. Track mutual followers, find non-followers and manage your Bluesky social network." />
+        <meta property="twitter:image" content="https://blue-analyze.com/blueanalyze.png" />
+        {/* Google Analytics */}
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-WFQ4TVVZ8N"></script>
         <script dangerouslySetInnerHTML={{
           __html: `
