@@ -1567,9 +1567,6 @@ const FollowerAnalysis: React.FC = () => {
               <p><span className="font-medium">Process:</span> {savedOperationInfo.operation === 'unfollow' ? 'Unfollow' : 'Follow'}</p>
               <p><span className="font-medium">Progress:</span> {savedOperationInfo.currentIndex}/{savedOperationInfo.totalItems} ({Math.round((savedOperationInfo.currentIndex / savedOperationInfo.totalItems) * 100)}%)</p>
               <p><span className="font-medium">Started:</span> {formatRemainingTime(savedOperationInfo.timestamp)}</p>
-              <p className="text-red-500 mt-2">
-                Note: Tokens expire after 2 hours. If your process was interrupted due to token expiration, enter your password and continue from where you left off.
-              </p>
             </div>
           )}
 
