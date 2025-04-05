@@ -35,6 +35,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f3f4f6" />
         <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1f2937" />
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-WFQ4TVVZ8N"></script>
+        <script dangerouslySetInnerHTML={{
+          __html: `
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-WFQ4TVVZ8N');
+          `
+        }} />
         <Meta />
         <Links />
       </head>
