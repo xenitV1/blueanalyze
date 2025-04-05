@@ -1,0 +1,9 @@
+{
+  "name": "blueanalyze-functions",
+  "private": true,
+  "dependencies": {
+    "@react-router/node": "^7.4.1",
+    "@remix-run/node": "^2.8.1",
+    "buffer": "^6.0.3"
+  }
+}

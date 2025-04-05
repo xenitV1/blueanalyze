@@ -1,6 +1,6 @@
 [[redirects]]
   from = "/*"
-  to = "/index.html"
+  to = "/.netlify/functions/server"
   status = 200
 
 [build]
@@ -9,3 +9,6 @@
 
 [dev]
   command = "npm run dev"
+
+[functions]
+  directory = "netlify/functions"
