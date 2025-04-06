@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FiGlobe, FiLoader, FiActivity } from 'react-icons/fi';
+import { FiGlobe, FiLoader, FiActivity, FiGithub } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useOperation } from '../../contexts/OperationContext';
@@ -47,6 +47,17 @@ const NavBar: React.FC = () => {
                 <span>{operation.completed}/{operation.totalUsers}</span>
               </div>
             )}
+
+            {/* GitHub linki */}
+            <a
+              href="https://github.com/vortic-0/blueanalyze"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none flex items-center"
+              aria-label="GitHub Repository"
+            >
+              <FiGithub className="h-4 w-4" />
+            </a>
 
             {/* Dil değiştirme butonu */}
             <button
