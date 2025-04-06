@@ -1,87 +1,146 @@
-# Welcome to React Router!
+# BlueAnalyze
 
-A modern, production-ready template for building full-stack React applications using React Router.
+BlueAnalyze is a comprehensive follower analysis tool developed for Bluesky users. It helps you analyze your follow relationships, identify users who don't follow you back, and strategically manage your account.
 
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/remix-run/react-router-templates/tree/main/default)
+![BlueAnalyze Logo](public/blueanalyze.png)
 
-## Features
+## 🚀 Features
 
-- 🚀 Server-side rendering
-- ⚡️ Hot Module Replacement (HMR)
-- 📦 Asset bundling and optimization
-- 🔄 Data loading and mutations
-- 🔒 TypeScript by default
-- 🎉 TailwindCSS for styling
-- 📖 [React Router docs](https://reactrouter.com/)
+- **Follower Analysis**: Analyze your followers and following in detail
+- **Non-Follower Detection**: Instantly identify accounts that don't follow you back
+- **Batch Unfollow**: Unfollow accounts that don't follow you back in bulk
+- **Target-Based Following**: Follow a specific user's followers or following in bulk
+- **Session Management**: Secure login using App Password and token management
+- **Multilingual Support**: English and Turkish language support
 
-## Getting Started
+## 📋 Data Schema
+
+BlueAnalyze uses the following core data structures:
+
+### BlueSkyUser
+
+```typescript
+interface BlueSkyUser {
+  did: string;              // Unique user identifier
+  handle: string;           // Username (e.g., user.bsky.social)
+  displayName?: string;     // Display name
+  avatar?: string;          // Profile picture URL
+  description?: string;     // Profile description
+  indexedAt?: string;       // Indexing date
+  followersCount?: number;  // Number of followers
+  followsCount?: number;    // Number of following
+}
+```
+
+### FollowerAnalysisResult
+
+```typescript
+interface FollowerAnalysisResult {
+  notFollowingBack: BlueSkyUser[];  // Accounts that don't follow you back
+  notFollowedBack: BlueSkyUser[];   // Accounts you don't follow back
+  mutuals: BlueSkyUser[];           // Mutual follows
+  followerCount: number;            // Total number of your followers
+  followingCount: number;           // Total number of accounts you follow
+}
+```
+
+### AuthResponse
+
+```typescript
+interface AuthResponse {
+  accessJwt: string;        // Access token for API requests
+  refreshJwt: string;       // Token used for refreshing
+  handle: string;           // Username
+  did: string;              // Unique user identifier
+  email?: string;           // Email address (if any)
+  emailConfirmed?: boolean; // Email confirmation status
+}
+```
+
+## 🔄 Workflow
+
+BlueAnalyze's operational logic includes the following steps:
+
+1. **Authentication**: User logs in with Bluesky username and App Password
+2. **Follower Analysis**: All followers and following are retrieved via API
+3. **Analysis Results**: Follow relationships are analyzed and categorized
+4. **Operations**: User can perform various actions based on the analysis (unfollow, follow, etc.)
+
+### API Requests
+
+The application uses the Bluesky ATP (AT Protocol) API:
+
+- `app.bsky.graph.getFollowers`: To get followers
+- `app.bsky.graph.getFollows`: To get following
+- `app.bsky.graph.follow`: To follow a user
+- `app.bsky.graph.unfollow`: To unfollow a user
+- `app.bsky.actor.searchActors`: To search for users
+
+## 🛠️ Setup and Development
+
+### Prerequisites
+
+- Node.js 18.0.0 or higher
+- npm 8.0.0 or higher
 
 ### Installation
 
-Install the dependencies:
-
 ```bash
+# Clone the repository
+git clone https://github.com/vortic-0/blueanalyze.git
+cd blueanalyze
+
+# Install dependencies
 npm install
 ```
 
 ### Development
 
-Start the development server with HMR:
-
 ```bash
+# Start the development server
 npm run dev
 ```
 
-Your application will be available at `http://localhost:5173`.
+The application will run at `http://localhost:5173`.
 
-## Building for Production
-
-Create a production build:
+### Build
 
 ```bash
+# Build for production
 npm run build
 ```
 
-## Deployment
+## 🌐 Deployment
 
-### Docker Deployment
-
-To build and run using Docker:
+BlueAnalyze is hosted on [Netlify](https://www.netlify.com/). To deploy your own copy:
 
 ```bash
-docker build -t my-app .
+# Install Netlify CLI
+npm install -g netlify-cli
 
-# Run the container
-docker run -p 3000:3000 my-app
+# Deploy to Netlify
+netlify deploy --prod
 ```
 
-The containerized application can be deployed to any platform that supports Docker, including:
+## 🔐 Security Notes
 
-- AWS ECS
-- Google Cloud Run
-- Azure Container Apps
-- Digital Ocean App Platform
-- Fly.io
-- Railway
+- BlueAnalyze only stores user data in browser localStorage
+- The application does not send passwords or credentials to any external servers
+- All API requests are made directly to the Bluesky API
+- Using an App Password is recommended to protect your main password
 
-### DIY Deployment
+## 📝 License
 
-If you're familiar with deploying Node applications, the built-in app server is production-ready.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-Make sure to deploy the output of `npm run build`
+## 👨‍💻 Contributors
 
-```
-├── package.json
-├── package-lock.json (or pnpm-lock.yaml, or bun.lockb)
-├── build/
-│   ├── client/    # Static assets
-│   └── server/    # Server-side code
-```
+- [vortic0](https://bsky.app/profile/vortic0.bsky.social) - Developer
 
-## Styling
+## 📧 Contact
 
-This template comes with [Tailwind CSS](https://tailwindcss.com/) already configured for a simple default starting experience. You can use whatever CSS framework you prefer.
+For questions or suggestions, you can reach out via [GitHub Issues](https://github.com/vortic-0/blueanalyze/issues).
 
 ---
 
-Built with ❤️ using React Router.
+🔹 BlueAnalyze is an unofficial tool and not directly affiliated with Bluesky Social.
