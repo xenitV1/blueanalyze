@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { FiSearch, FiUserPlus, FiUsers, FiLoader, FiSettings, FiClock } from 'react-icons/fi';
+import { FiSearch, FiUserPlus, FiUsers, FiLoader, FiSettings, FiClock, FiAlertCircle, FiCheck } from 'react-icons/fi';
 import type { BlueSkyUser } from '../../services/blueskyAPI';
 import { searchUsers, getUserFollowers, getUserFollowing, batchFollowUsersWithProgress, validateSession } from '../../services/blueskyAPI';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useOperation } from '../../contexts/OperationContext';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Card from '../ui/Card';
@@ -66,11 +67,22 @@ const TargetUserCard: React.FC<TargetUserCardProps> = ({ user, onSelectFollowers
 
 const TargetFollow: React.FC = () => {
   const { t, language } = useLanguage();
+  const { 
+    operation, 
+    startOperation, 
+    updateProgress, 
+    setTimeoutStatus, 
+    togglePause, 
+    completeOperation, 
+    resetOperation 
+  } = useOperation();
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [targetUser, setTargetUser] = useState<BlueSkyUser | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [followProgress, setFollowProgress] = useState({ completed: 0, total: 0 });
   const [analysisProgress, setAnalysisProgress] = useState({ phase: '', completed: 0, total: 0 });
@@ -82,13 +94,52 @@ const TargetFollow: React.FC = () => {
   const [followType, setFollowType] = useState<'followers' | 'following' | null>(null);
   const [hasActiveSession, setHasActiveSession] = useState(false);
   const [filteredUsers, setFilteredUsers] = useState<BlueSkyUser[]>([]);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [followCount, setFollowCount] = useState<number>(0);
   const [showFollowOptions, setShowFollowOptions] = useState(false);
   const [customFollowCount, setCustomFollowCount] = useState<string>('');
-  const [waitingTimeout, setWaitingTimeout] = useState(false);
-  const [timeoutSeconds, setTimeoutSeconds] = useState(0);
-  const [pauseProcess, setPauseProcess] = useState(false);
+  
+  // İşlem durumu için UI'da kullanılacak referanslar
+  const isActiveProcess = operation.type === 'targetFollow' && operation.isProcessing;
+  const isWaitingTimeout = operation.waitingTimeout;
+  const isPaused = operation.isPaused;
+  
+  // Sayfa yüklendiğinde devam eden bir targetFollow işlemi var mı kontrol et
+  useEffect(() => {
+    if (operation.type === 'targetFollow' && operation.isProcessing) {
+      console.log("Continuing existing target follow operation", operation);
+      
+      if (operation.targetUserDid) {
+        // Hedef kullanıcı bilgilerini yükle
+        const user: BlueSkyUser = {
+          did: operation.targetUserDid,
+          handle: operation.targetUser || '',
+          displayName: operation.targetUserDisplayName || operation.targetUser || '',
+        };
+        
+        setTargetUser(user);
+        setFollowType(operation.followType || null);
+        
+        // İşlem durumunu UI'a yansıt
+        setFollowProgress({
+          completed: operation.completed,
+          total: operation.totalUsers
+        });
+        
+        // Aktif işlemi göster
+        setIsLoading(true);
+        
+        // İşlem tamamlandıysa başarı mesajını göster
+        if (operation.isComplete) {
+          setFollowSuccess({
+            success: operation.success,
+            failed: operation.failed
+          });
+          setIsProcessComplete(true);
+          setIsLoading(false);
+        }
+      }
+    }
+  }, [operation]);
 
   // Kullanıcının aktif oturumunu kontrol eden fonksiyon
   const checkActiveSession = async () => {
@@ -209,7 +260,7 @@ const TargetFollow: React.FC = () => {
           // 100'den fazla takip edileni varsa, sayfalar halinde tümünü al
           if (cursor) {
             setAnalysisProgress({ 
-              phase: 'Takip Edilenler Alınıyor', 
+              phase: 'Kendi Takip Edilenleriniz Alınıyor', 
               completed: allUserFollowing.length, 
               total: Math.min(5000, totalFollowing * 2) // tahmini toplam
             });
@@ -227,7 +278,7 @@ const TargetFollow: React.FC = () => {
                   cursor = nextPage.data.cursor;
                   
                   setAnalysisProgress({ 
-                    phase: 'Takip Edilenler Alınıyor', 
+                    phase: 'Kendi Takip Edilenleriniz Alınıyor', 
                     completed: allUserFollowing.length, 
                     total: Math.min(5000, totalFollowing * 2)
                   });
@@ -255,7 +306,7 @@ const TargetFollow: React.FC = () => {
           setCustomFollowCount(notFollowing.length.toString());
         }
       } else {
-        // Oturum yoksa filtreleme yapmadan tüm takipçileri göster
+        // Oturum yoksa filtreleme yapmadan tüm takipçilerini göster
         setFilteredUsers(allFollowers);
         setFollowCount(allFollowers.length);
         setCustomFollowCount(allFollowers.length.toString());
@@ -264,13 +315,13 @@ const TargetFollow: React.FC = () => {
       setShowFollowOptions(true);
       setIsProcessing(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Takipçi analizi başarısız oldu');
+      setError(err instanceof Error ? err.message : 'Takip analizi başarısız oldu');
       setIsProcessing(false);
     } finally {
       setIsAnalyzing(false);
     }
   };
-  
+
   // Hedef kullanıcının takip ettiklerini analiz et
   const analyzeUserFollowing = async () => {
     if (!targetUser) return;
@@ -421,8 +472,14 @@ const TargetFollow: React.FC = () => {
     setFollowSuccess(null);
     setFollowProgress({ completed: 0, total: usersToFollow.length });
     setIsProcessComplete(false);
-    setWaitingTimeout(false);
-    setPauseProcess(false);
+    
+    // Global context'e işlem bilgisini ekle
+    startOperation('targetFollow', usersToFollow, {
+      targetUser: targetUser.handle,
+      targetUserDid: targetUser.did,
+      targetUserDisplayName: targetUser.displayName,
+      followType: followType
+    });
     
     try {
       let completed = 0;
@@ -430,32 +487,33 @@ const TargetFollow: React.FC = () => {
       let failed = 0;
       let errors: any[] = [];
       
-      // Her 500 kullanıcıda bir 2 dakika bekleme süresi ekle
+      // Her 1000 kullanıcıda bir 1 dakika bekleme süresi ekle
       for (let i = 0; i < usersToFollow.length; i++) {
         // İşlem durduruldu mu kontrol et
-        if (pauseProcess) {
+        if (operation.isPaused) {
           setError('İşlem kullanıcı tarafından durduruldu');
           break;
         }
 
-        // Her 500 kullanıcıda bir 2 dakika bekle (1000+ kullanıcı varsa)
-        if (i > 0 && i % 500 === 0 && usersToFollow.length >= 1000) {
-          setWaitingTimeout(true);
+        // Her 1000 kullanıcıda bir 1 dakika bekle (1000+ kullanıcı varsa)
+        if (i > 0 && i % 1000 === 0 && usersToFollow.length >= 1000) {
+          // Global context'e bekleme durumunu bildir
+          setTimeoutStatus(true, 60);
           
-          // 2 dakika (120 saniye) geri sayım
-          for (let seconds = 120; seconds > 0; seconds--) {
-            if (pauseProcess) {
-              break; // Kullanıcı işlemi durdurduysa beklemeden çık
-            }
-            
-            setTimeoutSeconds(seconds);
-            await new Promise(resolve => setTimeout(resolve, 1000)); // 1 saniye bekle
-          }
+          // Yeni geri sayım sistemiyle bekleme
+          const timeoutPromise = new Promise<void>(resolve => {
+            const checkInterval = setInterval(() => {
+              if (!operation.waitingTimeout || operation.isPaused) {
+                clearInterval(checkInterval);
+                resolve();
+              }
+            }, 1000);
+          });
           
-          setWaitingTimeout(false);
+          await timeoutPromise;
           
           // İşlem durduruldu mu tekrar kontrol et
-          if (pauseProcess) {
+          if (operation.isPaused) {
             setError('İşlem kullanıcı tarafından durduruldu');
             break;
           }
@@ -471,6 +529,9 @@ const TargetFollow: React.FC = () => {
             0,
             (completedCount, totalCount) => {
               // İlerleme durumunu güncelle
+              setFollowProgress({ completed: i + completedCount, total: usersToFollow.length });
+              // Global context'i güncelle
+              updateProgress(i + completedCount, usersToFollow.length, success, failed);
             }
           );
           
@@ -487,6 +548,7 @@ const TargetFollow: React.FC = () => {
         
         completed++;
         setFollowProgress({ completed, total: usersToFollow.length });
+        updateProgress(completed, usersToFollow.length, success, failed);
         
         // Kısa bir gecikme ekleyerek API'ye fazla yük bindirmekten kaçın
         await new Promise(resolve => setTimeout(resolve, 200));
@@ -497,12 +559,13 @@ const TargetFollow: React.FC = () => {
         failed
       });
       
+      // Global context'i tamamlandı olarak işaretle
+      completeOperation(success, failed);
       setIsProcessComplete(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Takip işlemi başarısız oldu');
     } finally {
       setIsLoading(false);
-      setWaitingTimeout(false);
     }
   };
   
@@ -539,17 +602,43 @@ const TargetFollow: React.FC = () => {
     setFilteredUsers([]);
     setFollowCount(0);
     setCustomFollowCount('');
-    setPauseProcess(false);
-    setWaitingTimeout(false);
   };
   
   // İşlemi durdur/devam ettir
-  const togglePauseProcess = () => {
-    setPauseProcess(!pauseProcess);
+  const handleTogglePause = () => {
+    togglePause();
+  };
+  
+  // İşlemi sıfırla
+  const handleReset = () => {
+    resetOperation();
+    resetProcess();
   };
   
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 relative">
+      {/* İşlem devam ediyor banner'ı - diğer sayfalara gidildiğinde de görünecek */}
+      {(isActiveProcess || (operation.type === 'targetFollow' && operation.isProcessing)) && (
+        <div className="fixed bottom-0 left-0 right-0 bg-blue-600 text-white py-2 px-4 shadow-lg z-50">
+          <div className="container mx-auto flex items-center justify-between">
+            <div className="flex items-center">
+              <FiLoader className="animate-spin mr-2" />
+              <span>
+                {operation.targetUserDisplayName} {operation.followType === 'followers' ? 'takipçileri' : 'takip ettikleri'} takip ediliyor: 
+                {operation.completed}/{operation.totalUsers}
+              </span>
+            </div>
+            <Button 
+              onClick={handleTogglePause} 
+              variant={isPaused ? "primary" : "danger"}
+              size="sm"
+            >
+              {isPaused ? "Devam Et" : "Durdur"}
+            </Button>
+          </div>
+        </div>
+      )}
+      
       <div className="mb-6">
         <h2 className="text-xl font-bold mb-2">{t.targetFollow}</h2>
         <p className="text-gray-600 dark:text-gray-400">
@@ -699,7 +788,7 @@ const TargetFollow: React.FC = () => {
             {filteredUsers.length >= 1000 && (
               <div className="mt-3 text-yellow-600 dark:text-yellow-400 text-sm">
                 <FiClock className="inline mr-1" />
-                Not: 1000+ hesap takip edilirken, her 500 takip sonrası sistem 2 dakika bekleyecektir.
+                Not: 1000+ hesap takip edilirken, her 1000 takip sonrası sistem 1 dakika bekleyecektir.
               </div>
             )}
           </div>
@@ -731,7 +820,7 @@ const TargetFollow: React.FC = () => {
         </div>
       )}
       
-      {(isLoading || isAnalyzing) && !waitingTimeout && (
+      {(isLoading || isAnalyzing) && !isWaitingTimeout && (
         <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
           <h3 className="text-lg font-bold mb-2">{t.processing}</h3>
           <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-4">
@@ -746,60 +835,83 @@ const TargetFollow: React.FC = () => {
             </p>
             
             <Button 
-              onClick={togglePauseProcess} 
-              variant={pauseProcess ? "primary" : "danger"}
+              onClick={handleTogglePause} 
+              variant={isPaused ? "primary" : "danger"}
               size="sm"
             >
-              {pauseProcess ? "Devam Et" : "Durdur"}
+              {isPaused ? "Devam Et" : "Durdur"}
             </Button>
           </div>
         </div>
       )}
       
-      {waitingTimeout && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
-          <h3 className="text-lg font-bold mb-2 flex items-center">
-            <FiClock className="mr-2" /> Rate Limit Önlemi
-          </h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-3">
-            Çok fazla istek göndermemek için {timeoutSeconds} saniye bekleniyor...
-          </p>
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-4">
-            <div 
-              className="bg-yellow-500 h-2.5 rounded-full" 
-              style={{ width: `${(120 - timeoutSeconds) / 120 * 100}%` }}
-            ></div>
-          </div>
-          <div className="flex justify-between items-center">
-            <p className="text-gray-600 dark:text-gray-400">
-              {followProgress.completed} / {followProgress.total} {t.userProcessed}
+      {/* Timeout modal - global timeout state kullanarak */}
+      {isWaitingTimeout && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full shadow-xl">
+            <h3 className="text-lg font-bold mb-2">Rate Limit Bekleniyor</h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              Bluesky API kısıtlamaları nedeniyle işleme devam etmeden önce beklemeniz gerekiyor.
             </p>
             
-            <Button 
-              onClick={togglePauseProcess} 
-              variant={pauseProcess ? "primary" : "danger"}
-              size="sm"
-            >
-              {pauseProcess ? "Devam Et" : "Durdur"}
-            </Button>
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-4">
+              <div className="bg-blue-600 h-2.5 rounded-full" 
+                  style={{ 
+                    width: `${Math.max(0, (60 - operation.remainingTimeout) / 60 * 100)}%`
+                  }}>
+              </div>
+            </div>
+            
+            <div className="flex justify-between items-center">
+              <div>
+                <span className="text-2xl font-bold">{Math.floor(operation.remainingTimeout / 60)}:{(operation.remainingTimeout % 60).toString().padStart(2, '0')}</span>
+                <span className="ml-2 text-gray-500">kalan süre</span>
+              </div>
+              
+              <Button 
+                onClick={handleTogglePause}
+                variant="danger"
+              >
+                İşlemi Durdur
+              </Button>
+            </div>
           </div>
         </div>
       )}
       
-      {isProcessComplete && followSuccess && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
-          <h3 className="text-lg font-bold mb-2">{t.operationComplete}</h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-2">
-            <span className="text-green-500">{followSuccess.success}</span> {t.successful},{' '}
-            <span className="text-red-500">{followSuccess.failed}</span> {t.failed}.
-          </p>
-          <Button onClick={resetProcess} variant="primary">
-            {t.newSearch}
-          </Button>
+      {/* İşlem tamamlandı mesajı */}
+      {operation.isComplete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full shadow-xl">
+            <h3 className="text-lg font-bold mb-2 flex items-center">
+              <FiCheck className="text-green-500 mr-2" /> İşlem Tamamlandı
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              {operation.targetUserDisplayName} kullanıcısının {operation.followType === 'followers' ? 'takipçileri' : 'takip ettikleri'} takip edildi.
+            </p>
+            
+            <div className="flex justify-between gap-2">
+              <div className="flex-1 bg-green-50 dark:bg-green-900/20 p-3 rounded-lg text-center">
+                <span className="block text-xl font-bold text-green-600 dark:text-green-400">{operation.success}</span>
+                <span className="text-sm text-green-700 dark:text-green-300">Başarılı</span>
+              </div>
+              <div className="flex-1 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg text-center">
+                <span className="block text-xl font-bold text-red-600 dark:text-red-400">{operation.failed}</span>
+                <span className="text-sm text-red-700 dark:text-red-300">Başarısız</span>
+              </div>
+            </div>
+            
+            <div className="mt-4 flex justify-end">
+              <Button 
+                onClick={handleReset}
+                variant="primary"
+              >
+                Tamam
+              </Button>
+            </div>
+          </div>
         </div>
       )}
-      
-      {error && <p className="text-red-500 mt-2">{error}</p>}
     </div>
   );
 };

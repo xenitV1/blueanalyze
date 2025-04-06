@@ -283,17 +283,119 @@ export interface DebugInfo {
  * Authenticate user and get session tokens
  */
 export const authenticateUser = async (handle: string, password: string): Promise<AuthResponse> => {
-  try {
-    const response = await axios.post(`${AUTH_URL}${CREATE_SESSION_ENDPOINT}`, {
-      identifier: handle,
-      password: password
-    });
-    
-    return response.data;
-  } catch (error) {
-    console.error('Authentication error:', error);
-    throw new Error('Failed to authenticate. Please check your username and password.');
+  const MAX_RETRIES = 3;
+  let retryCount = 0;
+  let lastError = null;
+
+  while (retryCount <= MAX_RETRIES) {
+    try {
+      console.log(`Authentication attempt ${retryCount + 1}/${MAX_RETRIES + 1} for user: ${handle}`);
+      
+      // Normalize handle format if needed (remove @ if present)
+      const normalizedHandle = handle.startsWith('@') ? handle.substring(1) : handle;
+      
+      // Ensure the handle has .bsky.social if no domain is specified
+      const formattedHandle = normalizedHandle.includes('.') 
+        ? normalizedHandle 
+        : `${normalizedHandle}.bsky.social`;
+      
+      console.log(`Using formatted handle: ${formattedHandle}`);
+      
+      const response = await axios.post(`${AUTH_URL}${CREATE_SESSION_ENDPOINT}`, {
+        identifier: formattedHandle,
+        password: password
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        timeout: 15000 // 15 second timeout
+      });
+      
+      console.log('Authentication successful');
+      return response.data;
+    } catch (error) {
+      lastError = error;
+      console.error('Authentication error:', error);
+      
+      // Handle specific error cases
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        const errorData = error.response?.data;
+        
+        // Format detailed error message
+        let errorMessage = 'Failed to authenticate.';
+        
+        if (status === 400) {
+          // Bad Request - typically incorrect credentials
+          errorMessage = 'Invalid username or password. If using an App Password, verify it was entered correctly.';
+          
+          // Check for specific error message in response
+          if (errorData && errorData.error) {
+            console.log('API error details:', errorData);
+            
+            if (errorData.error === 'InvalidPassword') {
+              errorMessage = 'Incorrect password. Remember to use an App Password, not your main account password.';
+            } else if (errorData.error === 'AccountNotFound') {
+              errorMessage = 'Account not found. Check your username and try again.';
+            } else {
+              errorMessage = `Authentication failed: ${errorData.error || errorData.message || 'Unknown error'}`;
+            }
+          }
+          
+          // Don't retry for credential errors
+          throw new Error(errorMessage);
+        } else if (status === 429) {
+          // Rate limit error
+          errorMessage = 'Too many login attempts. Please wait a few minutes and try again.';
+          throw new Error(errorMessage);
+        } else if (status === 500 || status === 502 || status === 503 || status === 504) {
+          // Server errors - good candidates for retry
+          errorMessage = `Server error (${status}). Retrying...`;
+          console.log(errorMessage);
+          
+          // Wait before retry with exponential backoff
+          if (retryCount < MAX_RETRIES) {
+            retryCount++;
+            const delay = 1000 * Math.pow(2, retryCount) + Math.floor(Math.random() * 1000);
+            console.log(`Waiting ${delay}ms before retry ${retryCount}`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+        } else if (!status) {
+          // Network error
+          errorMessage = 'Network error. Please check your internet connection.';
+          
+          // Retry for network errors
+          if (retryCount < MAX_RETRIES) {
+            retryCount++;
+            const delay = 1000 * retryCount + Math.floor(Math.random() * 500);
+            console.log(`Network issue, waiting ${delay}ms before retry ${retryCount}`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+        }
+        
+        // Throw the detailed error if we get here
+        throw new Error(errorMessage);
+      }
+      
+      // If retries are left, continue
+      if (retryCount < MAX_RETRIES) {
+        retryCount++;
+        const delay = 1000 * retryCount;
+        console.log(`Unexpected error, waiting ${delay}ms before retry ${retryCount}`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      
+      // If we've used all retries or it's not a retryable error
+      throw new Error('Failed to authenticate after multiple attempts. Please try again later or check your credentials.');
+    }
   }
+  
+  // This should not be reached, but just in case
+  throw lastError || new Error('Authentication failed due to an unknown error.');
 };
 
 /**

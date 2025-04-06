@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { FiGlobe } from 'react-icons/fi';
+import { FiGlobe, FiLoader, FiActivity } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useOperation } from '../../contexts/OperationContext';
 import type { Language } from '../../contexts/LanguageContext';
 
 const NavBar: React.FC = () => {
   const { language, setLanguage, t } = useLanguage();
+  const { operation, togglePause } = useOperation();
+
+  // İşlem aktif mi kontrol et
+  const isActiveOperation = operation.type !== 'none' && operation.isProcessing;
 
   // Toggle language
   const toggleLanguage = () => {
@@ -31,6 +36,18 @@ const NavBar: React.FC = () => {
           </div>
           
           <div className="flex items-center space-x-4">
+            {/* Aktif işlem bilgisi - Varsa göster */}
+            {isActiveOperation && (
+              <div className="flex items-center text-xs md:text-sm px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300">
+                <FiActivity className="h-3 w-3 mr-1 animate-pulse" />
+                <span className="hidden md:inline-block">
+                  {operation.type === 'targetFollow' ? 'Hedef Takip: ' : 
+                   operation.type === 'follow' ? 'Takip: ' : 'Takipten Çıkma: '}
+                </span>
+                <span>{operation.completed}/{operation.totalUsers}</span>
+              </div>
+            )}
+
             {/* Dil değiştirme butonu */}
             <button
               onClick={toggleLanguage}

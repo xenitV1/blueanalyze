@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import type { BlueSkyUser, FollowerAnalysisResult, DebugInfo } from '../../services/blueskyAPI';
 import { analyzeFollowers, batchUnfollowUsers, batchUnfollowUsersWithProgress, batchFollowUsers, batchFollowUsersWithProgress, getAllFollowers, getAllFollowing, getOperationProgress, clearOperationProgress, authenticateUser, saveSession, getSession, validateSession, clearSession } from '../../services/blueskyAPI';
+import { useOperation } from '../../contexts/OperationContext';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Card from '../ui/Card';
 import UserListItem from '../ui/UserListItem';
-import { FiUser, FiUserCheck, FiUserMinus, FiUserPlus, FiX, FiAlertTriangle, FiExternalLink, FiInfo, FiCheck, FiUsers, FiMessageSquare, FiTarget } from 'react-icons/fi';
+import { FiUser, FiUserCheck, FiUserMinus, FiUserPlus, FiX, FiAlertTriangle, FiExternalLink, FiInfo, FiCheck, FiUsers, FiMessageSquare, FiTarget, FiActivity } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import { useLanguage } from '../../contexts/LanguageContext';
 import TargetFollow from './TargetFollow';
 
 const FollowerAnalysis: React.FC = () => {
+  const { operation, togglePause } = useOperation();
   const [username, setUsername] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -963,644 +965,646 @@ const FollowerAnalysis: React.FC = () => {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-4">
-      {initialLoading ? (
-        // İlk yükleme ekranını göster
-        renderLoadingScreen()
-      ) : (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <h1 className="text-3xl font-bold text-center mb-8 text-gray-900 dark:text-white">
-            {t.appTitle}
-          </h1>
-          
-          {showLoginForm && (
-            <Card className="mb-8">
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <Input
-                  label={t.blueskyUsername}
-                  placeholder="e.g. username.bsky.social"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                />
-                <Input
-                  label={t.blueskyPassword}
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-                <div className="flex flex-wrap items-center gap-2 mt-4">
-                  <Button
-                    type="submit"
-                    className="w-full max-w-xs"
-                    isLoading={isLoading}
-                  >
-                    {isLoading ? t.loading : t.analyze}
-                  </Button>
-
-                  {savedOperationInfo && (
-                    <Button
-                      onClick={continueFromLastPoint}
-                      disabled={!password || isLoading || followInProgress}
-                      variant="secondary"
-                    >
-                      {t.continueProcess} ({savedOperationInfo.currentIndex}/{savedOperationInfo.totalItems})
-                    </Button>
-                  )}
-                </div>
-              </form>
-            </Card>
-          )}
-
-          {!showLoginForm && (
-            <div className="mb-4 flex justify-end">
-              <Button
-                onClick={handleNewSearch}
-                variant="outline"
-                size="sm"
-              >
-                Yeni Arama
-              </Button>
-            </div>
-          )}
-
-          {error && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="mb-8 p-4 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-200 rounded-lg flex items-start"
-            >
-              <FiAlertTriangle className="mt-1 mr-2 flex-shrink-0" />
-              <div>{error}</div>
-            </motion.div>
-          )}
-
-          {followersData && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-            >
-              <Card className="mb-8">
-                <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-white">
-                  {t.resultsFor} @{followersData.notFollowingBack[0]?.handle.split('.')[0] || username}
-                </h2>
-
-                <div className="grid grid-cols-3 gap-4 mb-6">
-                  <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <div className="flex justify-center mb-2">
-                      <FiUser className="text-blue-500 text-xl" />
-                    </div>
-                    <div className="text-2xl font-bold">{followersData.followerCount}</div>
-                    <div className="text-gray-500 dark:text-gray-400 text-sm">{t.followers}</div>
-                  </div>
-
-                  <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <div className="flex justify-center mb-2">
-                      <FiUserPlus className="text-green-500 text-xl" />
-                    </div>
-                    <div className="text-2xl font-bold">{followersData.followingCount}</div>
-                    <div className="text-gray-500 dark:text-gray-400 text-sm">{t.following}</div>
-                  </div>
-
-                  <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <div className="flex justify-center mb-2">
-                      <FiUserCheck className="text-purple-500 text-xl" />
-                    </div>
-                    <div className="text-2xl font-bold">{followersData.mutuals.length}</div>
-                    <div className="text-gray-500 dark:text-gray-400 text-sm">{t.mutuals}</div>
-                  </div>
-                </div>
-
-                <div className="border-b dark:border-gray-700 mb-6">
-                  <div className="flex flex-nowrap overflow-x-auto -mb-px">
-                    <button
-                      className={`py-2 px-4 mr-2 flex items-center ${
-                        activeTab === 'notFollowingBack'
-                          ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
-                          : 'text-gray-600 dark:text-gray-400'
-                      }`}
-                      onClick={() => setActiveTab('notFollowingBack')}
-                    >
-                      <FiUserMinus className="mr-2" />
-                      <span>{t.notFollowingBack} ({followersData.notFollowingBack.length})</span>
-                    </button>
-
-                    <button
-                      className={`py-2 px-4 mr-2 flex items-center ${
-                        activeTab === 'notFollowedBack'
-                          ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
-                          : 'text-gray-600 dark:text-gray-400'
-                      }`}
-                      onClick={() => setActiveTab('notFollowedBack')}
-                    >
-                      <FiUserPlus className="mr-2" />
-                      <span>{t.notFollowedBack} ({followersData.notFollowedBack.length})</span>
-                    </button>
-
-                    <button
-                      className={`py-2 px-4 mr-2 flex items-center ${
-                        activeTab === 'mutuals'
-                          ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
-                          : 'text-gray-600 dark:text-gray-400'
-                      }`}
-                      onClick={() => setActiveTab('mutuals')}
-                    >
-                      <FiUserCheck className="mr-2" />
-                      <span>{t.mutuals} ({followersData.mutuals.length})</span>
-                    </button>
-                    
-                    <button
-                      className={`py-2 px-4 mr-2 flex items-center ${
-                        activeTab === 'targetFollow'
-                          ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
-                          : 'text-gray-600 dark:text-gray-400'
-                      }`}
-                      onClick={() => setActiveTab('targetFollow')}
-                    >
-                      <FiTarget className="mr-2" />
-                      <span>{t.targetFollow}</span>
-                    </button>
-                  </div>
-                </div>
-
-                {activeTab === 'notFollowingBack' && followersData.notFollowingBack.length > 0 && (
-                  <div className="mb-4 flex justify-end">
-                    <Button
-                      className="flex items-center"
-                      variant="danger"
-                      onClick={() => setShowUnfollowModal(true)}
-                    >
-                      <FiUserMinus className="mr-2" /> {t.unfollowAllNonFollowers}
-                    </Button>
-                  </div>
-                )}
-
-                {activeTab === 'notFollowedBack' && followersData.notFollowedBack.length > 0 && (
-                  <div className="mb-4 flex justify-end">
-                    <Button
-                      className="flex items-center"
-                      variant="primary"
-                      onClick={() => {
-                        // Direkt olarak tüm 'Not Followed Back' kullanıcılarını takip et
-                        setNetworkUsers(followersData.notFollowedBack);
-                        setShowFollowModal(true);
-                      }}
-                    >
-                      <FiUserPlus className="mr-2" /> {language === 'TR' ? 'Tümünü Takip Et' : 'Follow All'}
-                    </Button>
-                  </div>
-                )}
-
-                {(activeTab === 'mutuals') && !showMutualsSelection && (
-                  <div className="mb-4 flex justify-end">
-                    <Button
-                      className="flex items-center"
-                      variant="primary"
-                      onClick={showMutualSelectionUI}
-                    >
-                      <FiUsers className="mr-2" /> View Network Options
-                    </Button>
-                  </div>
-                )}
-
-                {activeTab === 'notFollowingBack' && renderUserList(followersData.notFollowingBack)}
-                {activeTab === 'notFollowedBack' && renderUserList(followersData.notFollowedBack)}
-                {activeTab === 'mutuals' && renderUserList(followersData.mutuals)}
-                {activeTab === 'targetFollow' && <TargetFollow />}
-              </Card>
-            </motion.div>
-          )}
-
-          {/* Unfollow modal */}
-          {showUnfollowModal && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6"
-              >
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                    {language === 'TR' ? 'Takip Etmeyenleri Takipten Çık' : 'Unfollow Non-Followers'}
-                  </h3>
-                  <button
-                    onClick={() => setShowUnfollowModal(false)}
-                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                  >
-                    <FiX className="text-xl" />
-                  </button>
-                </div>
-
-                <p className="mb-4 text-gray-700 dark:text-gray-300">
-                  {language === 'TR' 
-                    ? `Sizi takip etmeyen ${followersData?.notFollowingBack.length} hesabı takipten çıkmak üzeresiniz. Bu işlem geri alınamaz.`
-                    : `You are about to unfollow ${followersData?.notFollowingBack.length} accounts that don't follow you back. This action cannot be undone.`
-                  }
-                </p>
-
-                {unfollowError && (
-                  <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-200 rounded text-sm">
-                    {unfollowError}
-                  </div>
-                )}
-
-                {unfollowSuccess && (
-                  <div className="mb-4 p-3 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-200 rounded text-sm">
-                    {language === 'TR'
-                      ? `${unfollowSuccess.success} hesap başarıyla takipten çıkarıldı.${unfollowSuccess.failed > 0 ? ` ${unfollowSuccess.failed} hesap takipten çıkarılamadı.` : ''}`
-                      : `Successfully unfollowed ${unfollowSuccess.success} accounts.${unfollowSuccess.failed > 0 ? ` Failed to unfollow ${unfollowSuccess.failed} accounts.` : ''}`
-                    }
-                  </div>
-                )}
-
-                {showDebugInfo && renderDebugInfo()}
-
-                {unfollowInProgress ? (
-                  <div className="mb-4">
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-2">
-                      <div
-                        className="bg-blue-600 h-2.5 rounded-full"
-                        style={{ width: `${(unfollowProgress.completed / unfollowProgress.total) * 100}%` }}
-                      ></div>
-                    </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
-                      {language === 'TR'
-                        ? `İşleniyor: ${unfollowProgress.completed} / ${unfollowProgress.total}`
-                        : `Processing ${unfollowProgress.completed} of ${unfollowProgress.total}`
-                      }
-                    </p>
-                  </div>
-                ) : (
-                  <div className="flex flex-col space-y-4">
-                    {/* Şifre girişi sadece oturum yoksa gösterilsin */}
-                    {!getSession() && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          {t.blueskyPassword}
-                        </label>
-                        <Input
-                          type="password"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="App Password"
-                        />
-                      </div>
-                    )}
-                    
-                    <div className="flex items-center space-x-4">
-                      <Button
-                        variant="secondary"
-                        className="flex-1"
-                        onClick={() => setShowUnfollowModal(false)}
-                      >
-                        {language === 'TR' ? 'İptal' : 'Cancel'}
-                      </Button>
-                      <Button
-                        onClick={handleBatchUnfollow}
-                        variant="danger"
-                        className="flex-1"
-                        isLoading={unfollowInProgress}
-                      >
-                        {language === 'TR' ? 'Tümünü Takipten Çık' : 'Unfollow All'}
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {debugInfo && (
-                  <div className="mt-4 flex justify-end">
-                    <button
-                      onClick={() => setShowDebugInfo(!showDebugInfo)}
-                      className="text-gray-600 dark:text-gray-400 text-sm hover:underline"
-                    >
-                      {showDebugInfo 
-                        ? (language === 'TR' ? 'Hata Bilgilerini Gizle' : 'Hide Debug Info')
-                        : (language === 'TR' ? 'Hata Bilgilerini Göster' : 'Show Debug Info')
-                      }
-                    </button>
-                  </div>
-                )}
-              </motion.div>
-            </div>
-          )}
-
-          {/* Follow modal */}
-          {showFollowModal && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6"
-              >
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                    {language === 'TR' ? 'Seçili Kullanıcıları Takip Et' : 'Follow Selected Users'}
-                  </h3>
-                  <button
-                    onClick={() => setShowFollowModal(false)}
-                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                  >
-                    <FiX className="text-xl" />
-                  </button>
-                </div>
-
-                <p className="mb-4 text-gray-700 dark:text-gray-300">
-                  {language === 'TR'
-                    ? `Seçili ${networkUsers.length} hesabı takip etmek üzeresiniz.`
-                    : `You are about to follow ${networkUsers.length} selected accounts.`
-                  }
-                </p>
-
-                {followError && (
-                  <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-200 rounded text-sm">
-                    {followError}
-                  </div>
-                )}
-
-                {followSuccess && (
-                  <div className="mb-4 p-3 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-200 rounded text-sm">
-                    {language === 'TR'
-                      ? `${followSuccess.success} hesap başarıyla takip edildi.${followSuccess.failed > 0 ? ` ${followSuccess.failed} hesap takip edilemedi.` : ''}`
-                      : `Successfully followed ${followSuccess.success} accounts.${followSuccess.failed > 0 ? ` Failed to follow ${followSuccess.failed} accounts.` : ''}`
-                    }
-                  </div>
-                )}
-
-                {showDebugInfo && renderDebugInfo()}
-
-                {followInProgress ? (
-                  <div className="mb-4">
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-2">
-                      <div
-                        className="bg-blue-600 h-2.5 rounded-full"
-                        style={{ width: `${(followProgress.completed / followProgress.total) * 100}%` }}
-                      ></div>
-                    </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
-                      {language === 'TR'
-                        ? `İşleniyor: ${followProgress.completed} / ${followProgress.total}`
-                        : `Processing ${followProgress.completed} of ${followProgress.total}`
-                      }
-                    </p>
-                  </div>
-                ) : (
-                  <div className="flex flex-col space-y-4">
-                    {/* Şifre girişi sadece oturum yoksa gösterilsin */}
-                    {!getSession() && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          {t.blueskyPassword}
-                        </label>
-                        <Input
-                          type="password"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="App Password"
-                        />
-                      </div>
-                    )}
-                    
-                    <div className="flex items-center space-x-4">
-                      <Button
-                        variant="secondary"
-                        className="flex-1"
-                        onClick={() => setShowFollowModal(false)}
-                      >
-                        {language === 'TR' ? 'İptal' : 'Cancel'}
-                      </Button>
-                      <Button
-                        onClick={handleBatchFollow}
-                        variant="primary"
-                        className="flex-1"
-                        isLoading={followInProgress}
-                      >
-                        {language === 'TR' ? 'Takip Et' : 'Follow'}
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {debugInfo && (
-                  <div className="mt-4 flex justify-end">
-                    <button
-                      onClick={() => setShowDebugInfo(!showDebugInfo)}
-                      className="text-gray-600 dark:text-gray-400 text-sm hover:underline"
-                    >
-                      {showDebugInfo 
-                        ? (language === 'TR' ? 'Hata Bilgilerini Gizle' : 'Hide Debug Info')
-                        : (language === 'TR' ? 'Hata Bilgilerini Göster' : 'Show Debug Info')
-                      }
-                    </button>
-                  </div>
-                )}
-              </motion.div>
-            </div>
-          )}
-
-          {/* Mutual Network Modal */}
-          {showMutualNetworkModal && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6"
-              >
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">Network Options</h3>
-                  <button
-                    onClick={() => setShowMutualNetworkModal(false)}
-                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                  >
-                    <FiX className="text-xl" />
-                  </button>
-                </div>
-
-                <p className="mb-4 text-gray-700 dark:text-gray-300">
-                  You've selected <strong>{getSelectedMutualUsers().length}</strong> mutual accounts. 
-                  Choose which network of these accounts you'd like to follow:
-                </p>
-
-                {networkFetchError && (
-                  <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-200 rounded text-sm">
-                    {networkFetchError}
-                  </div>
-                )}
-
-                {fetchingNetworkUsers ? (
-                  <div className="mb-4">
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-2">
-                      <div
-                        className="bg-blue-600 h-2.5 rounded-full"
-                        style={{ width: `${(networkFetchProgress.completed / networkFetchProgress.total) * 100}%` }}
-                      ></div>
-                    </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
-                      Fetching networks: {networkFetchProgress.completed} of {networkFetchProgress.total}
-                    </p>
-                  </div>
-                ) : resetFlag ? (
-                  <div className="mb-6 grid grid-cols-1 gap-4">
-                    <Button
-                      className="flex items-center justify-center"
-                      onClick={() => {
-                        setNetworkOption('followers');
-                        setResetFlag(false);
-                        // Temiz bir başlangıç için networkUsers'ı sıfırla
-                        setNetworkUsers([]);
-                        fetchNetworkUsers();
-                      }}
-                      variant="outline"
-                    >
-                      <FiUserPlus className="mr-2" /> Follow their followers
-                    </Button>
-                    <Button
-                      className="flex items-center justify-center"
-                      onClick={() => {
-                        setNetworkOption('following');
-                        setResetFlag(false);
-                        // Temiz bir başlangıç için networkUsers'ı sıfırla
-                        setNetworkUsers([]);
-                        fetchNetworkUsers();
-                      }}
-                      variant="outline"
-                    >
-                      <FiUserCheck className="mr-2" /> Follow accounts they follow
-                    </Button>
-                    <Button
-                      className="flex items-center justify-center"
-                      onClick={() => {
-                        setNetworkOption('both');
-                        setResetFlag(false);
-                        // Temiz bir başlangıç için networkUsers'ı sıfırla
-                        setNetworkUsers([]);
-                        fetchNetworkUsers();
-                      }}
-                      variant="primary"
-                    >
-                      <FiUsers className="mr-2" /> Follow their entire network
-                    </Button>
-                  </div>
-                ) : networkUsers.length > 0 ? (
-                  <div className="mb-4">
-                    <p className="text-green-600 dark:text-green-400 font-medium">
-                      Found {networkUsers.length} unique accounts in the selected network!
-                    </p>
-                    <div className="mt-4 flex flex-col space-y-2">
-                      <Button 
-                        onClick={() => {
-                          setShowMutualNetworkModal(false);
-                          setTimeout(() => setShowFollowModal(true), 100);
-                        }}
-                        variant="primary"
-                      >
-                        Follow these {networkUsers.length} accounts
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          // Start over butonuna tıklandığında
-                          // Sadece resetFlag'i değiştir, networkUsers henüz temizleme
-                          setResetFlag(true);
-                        }}
-                        variant="secondary"
-                      >
-                        Start over
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mb-6 grid grid-cols-1 gap-4">
-                    <Button
-                      className="flex items-center justify-center"
-                      onClick={() => {
-                        setNetworkOption('followers');
-                        setResetFlag(false);
-                        fetchNetworkUsers();
-                      }}
-                      variant="outline"
-                    >
-                      <FiUserPlus className="mr-2" /> Follow their followers
-                    </Button>
-                    <Button
-                      className="flex items-center justify-center"
-                      onClick={() => {
-                        setNetworkOption('following');
-                        setResetFlag(false);
-                        fetchNetworkUsers();
-                      }}
-                      variant="outline"
-                    >
-                      <FiUserCheck className="mr-2" /> Follow accounts they follow
-                    </Button>
-                    <Button
-                      className="flex items-center justify-center"
-                      onClick={() => {
-                        setNetworkOption('both');
-                        setResetFlag(false);
-                        fetchNetworkUsers();
-                      }}
-                      variant="primary"
-                    >
-                      <FiUsers className="mr-2" /> Follow their entire network
-                    </Button>
-                  </div>
-                )}
-
-                <div className="flex justify-end">
-                  <Button
-                    variant="secondary"
-                    onClick={() => setShowMutualNetworkModal(false)}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </motion.div>
-            </div>
-          )}
-
-          {/* Yarım kalan işlem bilgisi */}
-          {savedOperationInfo && (
-            <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900 rounded-md text-sm">
-              <p><span className="font-medium">Process:</span> {savedOperationInfo.operation === 'unfollow' ? 'Unfollow' : 'Follow'}</p>
-              <p><span className="font-medium">Progress:</span> {savedOperationInfo.currentIndex}/{savedOperationInfo.totalItems} ({Math.round((savedOperationInfo.currentIndex / savedOperationInfo.totalItems) * 100)}%)</p>
-              <p><span className="font-medium">Started:</span> {formatRemainingTime(savedOperationInfo.timestamp)}</p>
-            </div>
-          )}
-
-          {/* Footer ile feedback button */}
-          <div className="mt-8 mb-4 pt-4 border-t border-gray-200 dark:border-gray-700 text-center">
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-              Found this app useful? Have a suggestion?
-            </p>
-            <Button
-              variant="outline"
-              className="inline-flex items-center"
-              onClick={() => setShowFeedbackModal(true)}
-            >
-              <FiMessageSquare className="mr-2" />
-              {t.sendFeedback}
-            </Button>
+    <div className="relative">
+      <div className="w-full max-w-4xl mx-auto p-4">
+        {initialLoading ? (
+          // İlk yükleme ekranını göster
+          renderLoadingScreen()
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <h1 className="text-3xl font-bold text-center mb-8 text-gray-900 dark:text-white">
+              {t.appTitle}
+            </h1>
             
-            <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">
-              Built with 💙 by{" "}
-              <a 
-                href="https://bsky.app/profile/vortic0.bsky.social" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 inline-flex items-center"
+            {showLoginForm && (
+              <Card className="mb-8">
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <Input
+                    label={t.blueskyUsername}
+                    placeholder="e.g. username.bsky.social"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                  />
+                  <Input
+                    label={t.blueskyPassword}
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <div className="flex flex-wrap items-center gap-2 mt-4">
+                    <Button
+                      type="submit"
+                      className="w-full max-w-xs"
+                      isLoading={isLoading}
+                    >
+                      {isLoading ? t.loading : t.analyze}
+                    </Button>
+
+                    {savedOperationInfo && (
+                      <Button
+                        onClick={continueFromLastPoint}
+                        disabled={!password || isLoading || followInProgress}
+                        variant="secondary"
+                      >
+                        {t.continueProcess} ({savedOperationInfo.currentIndex}/{savedOperationInfo.totalItems})
+                      </Button>
+                    )}
+                  </div>
+                </form>
+              </Card>
+            )}
+
+            {!showLoginForm && (
+              <div className="mb-4 flex justify-end">
+                <Button
+                  onClick={handleNewSearch}
+                  variant="outline"
+                  size="sm"
+                >
+                  Yeni Arama
+                </Button>
+              </div>
+            )}
+
+            {error && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="mb-8 p-4 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-200 rounded-lg flex items-start"
               >
-                vortic0 <FiExternalLink className="ml-1 text-xs" />
-              </a>
+                <FiAlertTriangle className="mt-1 mr-2 flex-shrink-0" />
+                <div>{error}</div>
+              </motion.div>
+            )}
+
+            {followersData && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+              >
+                <Card className="mb-8">
+                  <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-white">
+                    {t.resultsFor} @{followersData.notFollowingBack[0]?.handle.split('.')[0] || username}
+                  </h2>
+
+                  <div className="grid grid-cols-3 gap-4 mb-6">
+                    <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <div className="flex justify-center mb-2">
+                        <FiUser className="text-blue-500 text-xl" />
+                      </div>
+                      <div className="text-2xl font-bold">{followersData.followerCount}</div>
+                      <div className="text-gray-500 dark:text-gray-400 text-sm">{t.followers}</div>
+                    </div>
+
+                    <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <div className="flex justify-center mb-2">
+                        <FiUserPlus className="text-green-500 text-xl" />
+                      </div>
+                      <div className="text-2xl font-bold">{followersData.followingCount}</div>
+                      <div className="text-gray-500 dark:text-gray-400 text-sm">{t.following}</div>
+                    </div>
+
+                    <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <div className="flex justify-center mb-2">
+                        <FiUserCheck className="text-purple-500 text-xl" />
+                      </div>
+                      <div className="text-2xl font-bold">{followersData.mutuals.length}</div>
+                      <div className="text-gray-500 dark:text-gray-400 text-sm">{t.mutuals}</div>
+                    </div>
+                  </div>
+
+                  <div className="border-b dark:border-gray-700 mb-6">
+                    <div className="flex flex-nowrap overflow-x-auto -mb-px">
+                      <button
+                        className={`py-2 px-4 mr-2 flex items-center ${
+                          activeTab === 'notFollowingBack'
+                            ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
+                            : 'text-gray-600 dark:text-gray-400'
+                        }`}
+                        onClick={() => setActiveTab('notFollowingBack')}
+                      >
+                        <FiUserMinus className="mr-2" />
+                        <span>{t.notFollowingBack} ({followersData.notFollowingBack.length})</span>
+                      </button>
+
+                      <button
+                        className={`py-2 px-4 mr-2 flex items-center ${
+                          activeTab === 'notFollowedBack'
+                            ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
+                            : 'text-gray-600 dark:text-gray-400'
+                        }`}
+                        onClick={() => setActiveTab('notFollowedBack')}
+                      >
+                        <FiUserPlus className="mr-2" />
+                        <span>{t.notFollowedBack} ({followersData.notFollowedBack.length})</span>
+                      </button>
+
+                      <button
+                        className={`py-2 px-4 mr-2 flex items-center ${
+                          activeTab === 'mutuals'
+                            ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
+                            : 'text-gray-600 dark:text-gray-400'
+                        }`}
+                        onClick={() => setActiveTab('mutuals')}
+                      >
+                        <FiUserCheck className="mr-2" />
+                        <span>{t.mutuals} ({followersData.mutuals.length})</span>
+                      </button>
+                      
+                      <button
+                        className={`py-2 px-4 mr-2 flex items-center ${
+                          activeTab === 'targetFollow'
+                            ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
+                            : 'text-gray-600 dark:text-gray-400'
+                        }`}
+                        onClick={() => setActiveTab('targetFollow')}
+                      >
+                        <FiTarget className="mr-2" />
+                        <span>{t.targetFollow}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {activeTab === 'notFollowingBack' && followersData.notFollowingBack.length > 0 && (
+                    <div className="mb-4 flex justify-end">
+                      <Button
+                        className="flex items-center"
+                        variant="danger"
+                        onClick={() => setShowUnfollowModal(true)}
+                      >
+                        <FiUserMinus className="mr-2" /> {t.unfollowAllNonFollowers}
+                      </Button>
+                    </div>
+                  )}
+
+                  {activeTab === 'notFollowedBack' && followersData.notFollowedBack.length > 0 && (
+                    <div className="mb-4 flex justify-end">
+                      <Button
+                        className="flex items-center"
+                        variant="primary"
+                        onClick={() => {
+                          // Direkt olarak tüm 'Not Followed Back' kullanıcılarını takip et
+                          setNetworkUsers(followersData.notFollowedBack);
+                          setShowFollowModal(true);
+                        }}
+                      >
+                        <FiUserPlus className="mr-2" /> {language === 'TR' ? 'Tümünü Takip Et' : 'Follow All'}
+                      </Button>
+                    </div>
+                  )}
+
+                  {(activeTab === 'mutuals') && !showMutualsSelection && (
+                    <div className="mb-4 flex justify-end">
+                      <Button
+                        className="flex items-center"
+                        variant="primary"
+                        onClick={showMutualSelectionUI}
+                      >
+                        <FiUsers className="mr-2" /> View Network Options
+                      </Button>
+                    </div>
+                  )}
+
+                  {activeTab === 'notFollowingBack' && renderUserList(followersData.notFollowingBack)}
+                  {activeTab === 'notFollowedBack' && renderUserList(followersData.notFollowedBack)}
+                  {activeTab === 'mutuals' && renderUserList(followersData.mutuals)}
+                  {activeTab === 'targetFollow' && <TargetFollow />}
+                </Card>
+              </motion.div>
+            )}
+
+            {/* Unfollow modal */}
+            {showUnfollowModal && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6"
+                >
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                      {language === 'TR' ? 'Takip Etmeyenleri Takipten Çık' : 'Unfollow Non-Followers'}
+                    </h3>
+                    <button
+                      onClick={() => setShowUnfollowModal(false)}
+                      className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                    >
+                      <FiX className="text-xl" />
+                    </button>
+                  </div>
+
+                  <p className="mb-4 text-gray-700 dark:text-gray-300">
+                    {language === 'TR' 
+                      ? `Sizi takip etmeyen ${followersData?.notFollowingBack.length} hesabı takipten çıkmak üzeresiniz. Bu işlem geri alınamaz.`
+                      : `You are about to unfollow ${followersData?.notFollowingBack.length} accounts that don't follow you back. This action cannot be undone.`
+                    }
+                  </p>
+
+                  {unfollowError && (
+                    <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-200 rounded text-sm">
+                      {unfollowError}
+                    </div>
+                  )}
+
+                  {unfollowSuccess && (
+                    <div className="mb-4 p-3 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-200 rounded text-sm">
+                      {language === 'TR'
+                        ? `${unfollowSuccess.success} hesap başarıyla takipten çıkarıldı.${unfollowSuccess.failed > 0 ? ` ${unfollowSuccess.failed} hesap takipten çıkarılamadı.` : ''}`
+                        : `Successfully unfollowed ${unfollowSuccess.success} accounts.${unfollowSuccess.failed > 0 ? ` Failed to unfollow ${unfollowSuccess.failed} accounts.` : ''}`
+                      }
+                    </div>
+                  )}
+
+                  {showDebugInfo && renderDebugInfo()}
+
+                  {unfollowInProgress ? (
+                    <div className="mb-4">
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-2">
+                        <div
+                          className="bg-blue-600 h-2.5 rounded-full"
+                          style={{ width: `${(unfollowProgress.completed / unfollowProgress.total) * 100}%` }}
+                        ></div>
+                      </div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
+                        {language === 'TR'
+                          ? `İşleniyor: ${unfollowProgress.completed} / ${unfollowProgress.total}`
+                          : `Processing ${unfollowProgress.completed} of ${unfollowProgress.total}`
+                        }
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col space-y-4">
+                      {/* Şifre girişi sadece oturum yoksa gösterilsin */}
+                      {!getSession() && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            {t.blueskyPassword}
+                          </label>
+                          <Input
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="App Password"
+                          />
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center space-x-4">
+                        <Button
+                          variant="secondary"
+                          className="flex-1"
+                          onClick={() => setShowUnfollowModal(false)}
+                        >
+                          {language === 'TR' ? 'İptal' : 'Cancel'}
+                        </Button>
+                        <Button
+                          onClick={handleBatchUnfollow}
+                          variant="danger"
+                          className="flex-1"
+                          isLoading={unfollowInProgress}
+                        >
+                          {language === 'TR' ? 'Tümünü Takipten Çık' : 'Unfollow All'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {debugInfo && (
+                    <div className="mt-4 flex justify-end">
+                      <button
+                        onClick={() => setShowDebugInfo(!showDebugInfo)}
+                        className="text-gray-600 dark:text-gray-400 text-sm hover:underline"
+                      >
+                        {showDebugInfo 
+                          ? (language === 'TR' ? 'Hata Bilgilerini Gizle' : 'Hide Debug Info')
+                          : (language === 'TR' ? 'Hata Bilgilerini Göster' : 'Show Debug Info')
+                        }
+                      </button>
+                    </div>
+                  )}
+                </motion.div>
+              </div>
+            )}
+
+            {/* Follow modal */}
+            {showFollowModal && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6"
+                >
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                      {language === 'TR' ? 'Seçili Kullanıcıları Takip Et' : 'Follow Selected Users'}
+                    </h3>
+                    <button
+                      onClick={() => setShowFollowModal(false)}
+                      className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                    >
+                      <FiX className="text-xl" />
+                    </button>
+                  </div>
+
+                  <p className="mb-4 text-gray-700 dark:text-gray-300">
+                    {language === 'TR'
+                      ? `Seçili ${networkUsers.length} hesabı takip etmek üzeresiniz.`
+                      : `You are about to follow ${networkUsers.length} selected accounts.`
+                    }
+                  </p>
+
+                  {followError && (
+                    <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-200 rounded text-sm">
+                      {followError}
+                    </div>
+                  )}
+
+                  {followSuccess && (
+                    <div className="mb-4 p-3 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-200 rounded text-sm">
+                      {language === 'TR'
+                        ? `${followSuccess.success} hesap başarıyla takip edildi.${followSuccess.failed > 0 ? ` ${followSuccess.failed} hesap takip edilemedi.` : ''}`
+                        : `Successfully followed ${followSuccess.success} accounts.${followSuccess.failed > 0 ? ` Failed to follow ${followSuccess.failed} accounts.` : ''}`
+                      }
+                    </div>
+                  )}
+
+                  {showDebugInfo && renderDebugInfo()}
+
+                  {followInProgress ? (
+                    <div className="mb-4">
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-2">
+                        <div
+                          className="bg-blue-600 h-2.5 rounded-full"
+                          style={{ width: `${(followProgress.completed / followProgress.total) * 100}%` }}
+                        ></div>
+                      </div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
+                        {language === 'TR'
+                          ? `İşleniyor: ${followProgress.completed} / ${followProgress.total}`
+                          : `Processing ${followProgress.completed} of ${followProgress.total}`
+                        }
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col space-y-4">
+                      {/* Şifre girişi sadece oturum yoksa gösterilsin */}
+                      {!getSession() && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            {t.blueskyPassword}
+                          </label>
+                          <Input
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="App Password"
+                          />
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center space-x-4">
+                        <Button
+                          variant="secondary"
+                          className="flex-1"
+                          onClick={() => setShowFollowModal(false)}
+                        >
+                          {language === 'TR' ? 'İptal' : 'Cancel'}
+                        </Button>
+                        <Button
+                          onClick={handleBatchFollow}
+                          variant="primary"
+                          className="flex-1"
+                          isLoading={followInProgress}
+                        >
+                          {language === 'TR' ? 'Takip Et' : 'Follow'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {debugInfo && (
+                    <div className="mt-4 flex justify-end">
+                      <button
+                        onClick={() => setShowDebugInfo(!showDebugInfo)}
+                        className="text-gray-600 dark:text-gray-400 text-sm hover:underline"
+                      >
+                        {showDebugInfo 
+                          ? (language === 'TR' ? 'Hata Bilgilerini Gizle' : 'Hide Debug Info')
+                          : (language === 'TR' ? 'Hata Bilgilerini Göster' : 'Show Debug Info')
+                        }
+                      </button>
+                    </div>
+                  )}
+                </motion.div>
+              </div>
+            )}
+
+            {/* Mutual Network Modal */}
+            {showMutualNetworkModal && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6"
+                >
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Network Options</h3>
+                    <button
+                      onClick={() => setShowMutualNetworkModal(false)}
+                      className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                    >
+                      <FiX className="text-xl" />
+                    </button>
+                  </div>
+
+                  <p className="mb-4 text-gray-700 dark:text-gray-300">
+                    You've selected <strong>{getSelectedMutualUsers().length}</strong> mutual accounts. 
+                    Choose which network of these accounts you'd like to follow:
+                  </p>
+
+                  {networkFetchError && (
+                    <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-200 rounded text-sm">
+                      {networkFetchError}
+                    </div>
+                  )}
+
+                  {fetchingNetworkUsers ? (
+                    <div className="mb-4">
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-2">
+                        <div
+                          className="bg-blue-600 h-2.5 rounded-full"
+                          style={{ width: `${(networkFetchProgress.completed / networkFetchProgress.total) * 100}%` }}
+                        ></div>
+                      </div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
+                        Fetching networks: {networkFetchProgress.completed} of {networkFetchProgress.total}
+                      </p>
+                    </div>
+                  ) : resetFlag ? (
+                    <div className="mb-6 grid grid-cols-1 gap-4">
+                      <Button
+                        className="flex items-center justify-center"
+                        onClick={() => {
+                          setNetworkOption('followers');
+                          setResetFlag(false);
+                          // Temiz bir başlangıç için networkUsers'ı sıfırla
+                          setNetworkUsers([]);
+                          fetchNetworkUsers();
+                        }}
+                        variant="outline"
+                      >
+                        <FiUserPlus className="mr-2" /> Follow their followers
+                      </Button>
+                      <Button
+                        className="flex items-center justify-center"
+                        onClick={() => {
+                          setNetworkOption('following');
+                          setResetFlag(false);
+                          // Temiz bir başlangıç için networkUsers'ı sıfırla
+                          setNetworkUsers([]);
+                          fetchNetworkUsers();
+                        }}
+                        variant="outline"
+                      >
+                        <FiUserCheck className="mr-2" /> Follow accounts they follow
+                      </Button>
+                      <Button
+                        className="flex items-center justify-center"
+                        onClick={() => {
+                          setNetworkOption('both');
+                          setResetFlag(false);
+                          // Temiz bir başlangıç için networkUsers'ı sıfırla
+                          setNetworkUsers([]);
+                          fetchNetworkUsers();
+                        }}
+                        variant="primary"
+                      >
+                        <FiUsers className="mr-2" /> Follow their entire network
+                      </Button>
+                    </div>
+                  ) : networkUsers.length > 0 ? (
+                    <div className="mb-4">
+                      <p className="text-green-600 dark:text-green-400 font-medium">
+                        Found {networkUsers.length} unique accounts in the selected network!
+                      </p>
+                      <div className="mt-4 flex flex-col space-y-2">
+                        <Button 
+                          onClick={() => {
+                            setShowMutualNetworkModal(false);
+                            setTimeout(() => setShowFollowModal(true), 100);
+                          }}
+                          variant="primary"
+                        >
+                          Follow these {networkUsers.length} accounts
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            // Start over butonuna tıklandığında
+                            // Sadece resetFlag'i değiştir, networkUsers henüz temizleme
+                            setResetFlag(true);
+                          }}
+                          variant="secondary"
+                        >
+                          Start over
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mb-6 grid grid-cols-1 gap-4">
+                      <Button
+                        className="flex items-center justify-center"
+                        onClick={() => {
+                          setNetworkOption('followers');
+                          setResetFlag(false);
+                          fetchNetworkUsers();
+                        }}
+                        variant="outline"
+                      >
+                        <FiUserPlus className="mr-2" /> Follow their followers
+                      </Button>
+                      <Button
+                        className="flex items-center justify-center"
+                        onClick={() => {
+                          setNetworkOption('following');
+                          setResetFlag(false);
+                          fetchNetworkUsers();
+                        }}
+                        variant="outline"
+                      >
+                        <FiUserCheck className="mr-2" /> Follow accounts they follow
+                      </Button>
+                      <Button
+                        className="flex items-center justify-center"
+                        onClick={() => {
+                          setNetworkOption('both');
+                          setResetFlag(false);
+                          fetchNetworkUsers();
+                        }}
+                        variant="primary"
+                      >
+                        <FiUsers className="mr-2" /> Follow their entire network
+                      </Button>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end">
+                    <Button
+                      variant="secondary"
+                      onClick={() => setShowMutualNetworkModal(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+
+            {/* Yarım kalan işlem bilgisi */}
+            {savedOperationInfo && (
+              <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900 rounded-md text-sm">
+                <p><span className="font-medium">Process:</span> {savedOperationInfo.operation === 'unfollow' ? 'Unfollow' : 'Follow'}</p>
+                <p><span className="font-medium">Progress:</span> {savedOperationInfo.currentIndex}/{savedOperationInfo.totalItems} ({Math.round((savedOperationInfo.currentIndex / savedOperationInfo.totalItems) * 100)}%)</p>
+                <p><span className="font-medium">Started:</span> {formatRemainingTime(savedOperationInfo.timestamp)}</p>
+              </div>
+            )}
+
+            {/* Footer ile feedback button */}
+            <div className="mt-8 mb-4 pt-4 border-t border-gray-200 dark:border-gray-700 text-center">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                Found this app useful? Have a suggestion?
+              </p>
+              <Button
+                variant="outline"
+                className="inline-flex items-center"
+                onClick={() => setShowFeedbackModal(true)}
+              >
+                <FiMessageSquare className="mr-2" />
+                {t.sendFeedback}
+              </Button>
+              
+              <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">
+                Built with 💙 by{" "}
+                <a 
+                  href="https://bsky.app/profile/vortic0.bsky.social" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 inline-flex items-center"
+                >
+                  vortic0 <FiExternalLink className="ml-1 text-xs" />
+                </a>
+              </div>
             </div>
-          </div>
-          
-          {/* Feedback modal */}
-          {showFeedbackModal && renderFeedbackModal()}
-        </motion.div>
-      )}
+            
+            {/* Feedback modal */}
+            {showFeedbackModal && renderFeedbackModal()}
+          </motion.div>
+        )}
+      </div>
     </div>
   );
 };
