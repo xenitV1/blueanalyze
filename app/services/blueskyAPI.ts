@@ -165,18 +165,40 @@ export const saveOperationProgress = (
     // İşlem anahtarını oluştur
     const storageKey = `${username}_${operation}_progress`;
     
-    // İşlem durumunu kaydet
+    // İşlem durumunu kaydet - daha az veri kullanarak
     const progressData = {
       currentIndex,
       totalItems,
       timestamp: Date.now(),
-      completedItems: currentIndex,
-      remainingItems: totalItems - currentIndex,
-      // İşlenecek kalan öğelerin DID'lerini sakla (maksimum 100 öğe)
-      remainingIds: itemList.slice(currentIndex, currentIndex + 100).map(item => item.did)
+      // Kalan öğelerin tam listesini saklamak yerine, sadece indeksi sakla
+      // Eğer kalan öğelerin DID'lerini saklamak gerekiyorsa, sayıyı sınırla (100 yerine 20)
+      remainingIds: itemList.slice(currentIndex, Math.min(currentIndex + 20, itemList.length)).map(item => item.did)
     };
     
-    localStorage.setItem(storageKey, JSON.stringify(progressData));
+    try {
+      // Önce mevcut localStorage kullanımını kontrol et 
+      const serializedData = JSON.stringify(progressData);
+      if (serializedData.length > 500000) { // 500KB civarı bir limit
+        console.warn('İşlem durumu verisi çok büyük, remainingIds kaldırılıyor');
+        // Büyük verileri kaldır
+        progressData.remainingIds = [];
+      }
+      
+      localStorage.setItem(storageKey, JSON.stringify(progressData));
+    } catch (storageError) {
+      // Eğer quota aşıldıysa, daha az veri saklamayı dene
+      console.warn('Storage quota aşıldı, daha az veri saklanıyor', storageError);
+      
+      // TypeScript uyumlu şekilde boş array olarak ayarla
+      progressData.remainingIds = [];
+      
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(progressData));
+      } catch (finalError) {
+        // Son bir deneme daha başarısız olursa, sadece indeksi sakla
+        console.error('LocalStorage kaydetme tamamen başarısız oldu, işlem durumu kaydedilemeyecek', finalError);
+      }
+    }
   } catch (error) {
     console.error('İşlem durumu kaydedilemedi:', error);
   }
@@ -401,7 +423,11 @@ export const authenticateUser = async (handle: string, password: string): Promis
 /**
  * Unfollow a user with detailed debug info
  */
-export const unfollowUser = async (token: string, userDid: string): Promise<{success: boolean, debug: DebugInfo}> => {
+export const unfollowUser = async (
+  token: string, 
+  userDid: string,
+  signal?: AbortSignal
+): Promise<{success: boolean, debug: DebugInfo}> => {
   const debugInfo: DebugInfo = {
     error: false,
     message: 'Success'
@@ -413,6 +439,13 @@ export const unfollowUser = async (token: string, userDid: string): Promise<{suc
   
   while (retryCount <= MAX_RETRIES) {
     try {
+      // İptal edildi mi kontrol et
+      if (signal?.aborted) {
+        debugInfo.error = true;
+        debugInfo.message = 'Operation was canceled by the user';
+        return { success: false, debug: debugInfo };
+      }
+      
       // First, we need to find the follow record to delete
       console.log(`Finding follow record for user: ${userDid}${retryCount > 0 ? ` (Retry ${retryCount}/${MAX_RETRIES})` : ''}`);
       
@@ -454,6 +487,13 @@ export const unfollowUser = async (token: string, userDid: string): Promise<{suc
       
       // Keep fetching pages until we find the record or run out of pages
       while (pageCount < MAX_PAGES) {
+        // İptal edildi mi kontrol et
+        if (signal?.aborted) {
+          debugInfo.error = true;
+          debugInfo.message = 'Operation was canceled by the user';
+          return { success: false, debug: debugInfo };
+        }
+        
         pageCount++;
         console.log(`Fetching follow records page ${pageCount}${cursor ? ' with cursor' : ''}`);
         
@@ -470,7 +510,9 @@ export const unfollowUser = async (token: string, userDid: string): Promise<{suc
             },
             headers: {
               'Authorization': `Bearer ${token}`
-            }
+            },
+            // Signal'i ekle
+            signal: signal
           }
         );
         
@@ -523,6 +565,13 @@ export const unfollowUser = async (token: string, userDid: string): Promise<{suc
       console.log(`Using endpoint: ${AUTH_URL}/xrpc/com.atproto.repo.deleteRecord`);
       
       try {
+        // İptal edildi mi kontrol et
+        if (signal?.aborted) {
+          debugInfo.error = true;
+          debugInfo.message = 'Operation was canceled by the user';
+          return { success: false, debug: debugInfo };
+        }
+        
         const response = await axios.post(`${AUTH_URL}/xrpc/com.atproto.repo.deleteRecord`, 
           {
             repo: did,
@@ -533,7 +582,9 @@ export const unfollowUser = async (token: string, userDid: string): Promise<{suc
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
-            }
+            },
+            // Signal'i ekle
+            signal: signal
           }
         );
         
@@ -541,7 +592,14 @@ export const unfollowUser = async (token: string, userDid: string): Promise<{suc
         debugInfo.status = response.status;
         
         return { success: true, debug: debugInfo };
-      } catch (deleteError) {
+      } catch (deleteError: any) {
+        // İptal edildi mi kontrol et
+        if (deleteError.name === 'AbortError' || deleteError.message === 'canceled') {
+          debugInfo.error = true;
+          debugInfo.message = 'Operation was canceled by the user';
+          return { success: false, debug: debugInfo };
+        }
+        
         if (axios.isAxiosError(deleteError) && (deleteError.response?.status === 500 || deleteError.response?.status === 502)) {
           // If we get a 500 or 502 error, wait and retry
           const errorStatus = deleteError.response?.status;
@@ -564,7 +622,14 @@ export const unfollowUser = async (token: string, userDid: string): Promise<{suc
         // If it's not a 500/502 error or we've exhausted retries, throw to be caught by outer catch
         throw deleteError;
       }
-    } catch (error) {
+    } catch (error: any) {
+      // İptal edildi mi kontrol et
+      if (error.name === 'AbortError' || error.message === 'canceled') {
+        debugInfo.error = true;
+        debugInfo.message = 'Operation was canceled by the user';
+        return { success: false, debug: debugInfo };
+      }
+      
       if (axios.isAxiosError(error) && (error.response?.status === 500 || error.response?.status === 502) && retryCount < MAX_RETRIES) {
         // If we get a 500 or 502 error and have retries left, try again
         const errorStatus = error.response?.status;
@@ -640,7 +705,8 @@ export const batchUnfollowUsersWithProgress = async (
   password: string | null, 
   users: BlueSkyUser[], 
   startIndex: number = 0,
-  onProgress?: (completed: number, total: number, lastError?: DebugInfo) => void
+  onProgress?: (completed: number, total: number, lastError?: DebugInfo) => void,
+  signal?: AbortSignal
 ): Promise<{success: number, failed: number, errors: DebugInfo[], lastProcessedIndex: number}> => {
   try {
     // First authenticate
@@ -662,11 +728,29 @@ export const batchUnfollowUsersWithProgress = async (
     
     console.log('Authentication successful', authResponse.handle);
     
+    // Başlangıç durumunu callback ile bildir
+    if (onProgress) {
+      onProgress(startIndex, users.length);
+    }
+    
     let successCount = 0;
     let failedCount = 0;
     const total = users.length;
     const errors: DebugInfo[] = [];
     let lastProcessedIndex = startIndex;
+    
+    // İptal edilip edilmediğini kontrol et
+    if (signal?.aborted) {
+      console.log('Request was already aborted');
+      throw new Error('canceled');
+    }
+    
+    // AbortSignal eventListener ekle
+    if (signal) {
+      signal.addEventListener('abort', () => {
+        console.log('Abort signal received in batchUnfollowUsersWithProgress');
+      });
+    }
     
     // Break into smaller chunks to avoid rate limiting (iş parçalama)
     const CHUNK_SIZE = 5; // Process in chunks of 5 users
@@ -683,14 +767,34 @@ export const batchUnfollowUsersWithProgress = async (
     
     // Process each chunk
     for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+      // İptal edildi mi kontrol et
+      if (signal?.aborted) {
+        console.log('Operation was aborted during chunk processing');
+        throw new Error('canceled');
+      }
+      
       const chunk = chunks[chunkIndex];
       console.log(`Processing chunk ${chunkIndex + 1}/${chunks.length} with ${chunk.length} users`);
       
       // Token süresini kontrol et
       if (!isTokenValid(authResponse.accessJwt)) {
         console.log('Token süresi dolmak üzere, işlem duraklatıldı');
+        
         // İşlem durumunu kaydet
         saveOperationProgress('unfollow', handle, completedUsers, total, users);
+        
+        // Token süresi hatası oluştur
+        const tokenError: DebugInfo = {
+          error: true,
+          message: 'Authentication token is about to expire, operation paused'
+        };
+        errors.push(tokenError);
+        
+        // Callback ile bildir
+        if (onProgress) {
+          onProgress(completedUsers, total, tokenError);
+        }
+        
         return {
           success: successCount,
           failed: failedCount,
@@ -701,42 +805,91 @@ export const batchUnfollowUsersWithProgress = async (
       
       // Process users in this chunk with a queue
       for (let i = 0; i < chunk.length; i++) {
+        // Her kullanıcı işlemi öncesi iptal edildi mi kontrol et
+        if (signal?.aborted) {
+          console.log('Operation was aborted during user processing');
+          throw new Error('canceled');
+        }
+        
         const user = chunk[i];
         console.log(`Unfollowing user ${completedUsers + 1}/${total}: ${user.handle}`);
         
-        const { success, debug } = await unfollowUser(authResponse.accessJwt, user.did);
-        
-        if (success) {
-          successCount++;
-        } else {
+        try {
+          // Signal parametresini unfollowUser'a da geçir
+          const { success, debug } = await unfollowUser(authResponse.accessJwt, user.did, signal);
+          
+          if (success) {
+            successCount++;
+            console.log(`Successfully unfollowed user: ${user.handle}`);
+          } else {
+            failedCount++;
+            errors.push(debug);
+            console.warn(`Failed to unfollow user: ${user.handle}, reason: ${debug.message}`);
+            
+            // Only keep last 5 errors to avoid excessive memory usage
+            if (errors.length > 5) {
+              errors.shift();
+            }
+            
+            // Token süresi dolduysa işlemi durdur
+            if (debug.message === 'Auth token has expired' || debug.message === 'Authentication token has expired or is invalid') {
+              console.log('Token süresi doldu, işlem duraklatıldı');
+              // İşlem durumunu kaydet
+              saveOperationProgress('unfollow', handle, completedUsers, total, users);
+              
+              // Callback ile bildir
+              if (onProgress) {
+                onProgress(completedUsers, total, debug);
+              }
+              
+              return {
+                success: successCount,
+                failed: failedCount,
+                errors,
+                lastProcessedIndex: completedUsers
+              };
+            }
+          }
+          
+          lastProcessedIndex = completedUsers;
+          completedUsers++;
+          
+          // Call progress callback
+          if (onProgress) {
+            // Başarılı olsa da olmasa da güncel durumu bildir
+            onProgress(completedUsers, total, debug.error ? debug : undefined);
+          }
+        } catch (userError: any) {
+          // İptal edilme durumunu kontrol et
+          if (userError.name === 'AbortError' || userError.message === 'canceled') {
+            console.log('User operation was aborted');
+            throw userError; // Hatayı yukarı fırlat
+          }
+          
+          // Beklenmeyen hata durumunda da işlemi devam ettir
           failedCount++;
-          errors.push(debug);
+          
+          const errorDebug: DebugInfo = {
+            error: true,
+            message: userError instanceof Error ? userError.message : 'Unknown error during unfollow operation',
+            details: userError
+          };
+          
+          errors.push(errorDebug);
+          console.error(`Exception while unfollowing user ${user.handle}:`, userError);
           
           // Only keep last 5 errors to avoid excessive memory usage
           if (errors.length > 5) {
             errors.shift();
           }
           
-          // Token süresi dolduysa işlemi durdur
-          if (debug.message === 'Auth token has expired' || debug.message === 'Authentication token has expired or is invalid') {
-            console.log('Token süresi doldu, işlem duraklatıldı');
-            // İşlem durumunu kaydet
-            saveOperationProgress('unfollow', handle, completedUsers, total, users);
-            return {
-              success: successCount,
-              failed: failedCount,
-              errors,
-              lastProcessedIndex: completedUsers
-            };
+          // İşleme devam et ama hata bilgisini callback'e bildir
+          lastProcessedIndex = completedUsers;
+          completedUsers++;
+          
+          if (onProgress) {
+            onProgress(completedUsers, total, errorDebug);
           }
-        }
-        
-        lastProcessedIndex = completedUsers;
-        completedUsers++;
-        
-        // Call progress callback
-        if (onProgress) {
-          onProgress(completedUsers, total, debug.error ? debug : undefined);
         }
         
         // İşlem durumunu düzenli olarak kaydet (her 10 kullanıcıda bir)
@@ -745,7 +898,7 @@ export const batchUnfollowUsersWithProgress = async (
         }
         
         // Add a delay with jitter between each user in the chunk
-        if (i < chunk.length - 1) {
+        if (i < chunk.length - 1 && !signal?.aborted) {
           // Base delay of 500ms plus random jitter between 0-300ms
           const delay = 500 + Math.floor(Math.random() * 300);
           console.log(`Waiting ${delay}ms before next user in chunk`);
@@ -754,7 +907,7 @@ export const batchUnfollowUsersWithProgress = async (
       }
       
       // Add a longer delay between chunks with jitter
-      if (chunkIndex < chunks.length - 1) {
+      if (chunkIndex < chunks.length - 1 && !signal?.aborted) {
         // Longer delay between chunks (2-3 seconds)
         const chunkDelay = 2000 + Math.floor(Math.random() * 1000);
         console.log(`Completed chunk ${chunkIndex + 1}/${chunks.length}. Waiting ${chunkDelay}ms before next chunk`);
@@ -767,14 +920,45 @@ export const batchUnfollowUsersWithProgress = async (
     // İşlem tamamlandı, ilerleme bilgisini temizle
     clearOperationProgress('unfollow', handle);
     
+    // Final callback
+    if (onProgress) {
+      onProgress(completedUsers, total);
+    }
+    
     return {
       success: successCount,
       failed: failedCount,
       errors,
       lastProcessedIndex: completedUsers
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in batch unfollow operation:', error);
+    
+    // İptal edildi mi kontrol et
+    if (error.name === 'AbortError' || error.message === 'canceled') {
+      console.log('Batch unfollow operation was aborted by the user');
+      
+      // İptal bilgisini callback'e bildir
+      if (onProgress) {
+        const abortInfo: DebugInfo = {
+          error: true,
+          message: 'Operation was canceled by the user',
+          details: { aborted: true }
+        };
+        onProgress(startIndex, users.length, abortInfo);
+      }
+    } else {
+      // Ana hata durumunda callback fonksiyonunu çağır
+      if (onProgress) {
+        const errorInfo: DebugInfo = {
+          error: true,
+          message: error instanceof Error ? error.message : 'Unknown batch unfollow error',
+          details: error
+        };
+        onProgress(startIndex, users.length, errorInfo);
+      }
+    }
+    
     throw error;
   }
 };
@@ -1295,16 +1479,40 @@ export const followUser = async (token: string, userDid: string): Promise<{succe
       debugInfo.error = true;
       
       if (axios.isAxiosError(error)) {
-        debugInfo.status = error.response?.status || 0;
+        debugInfo.status = error.response?.status;
         debugInfo.message = error.message;
-        debugInfo.details = error.response?.data || error.message;
         
-        // Check for rate limit errors
-        if (error.response?.status === 429) {
-          debugInfo.message = 'Rate limit exceeded. Please try again later.';
+        if (error.response) {
+          // Server responded with a status code outside of 2xx range
+          debugInfo.details = {
+            status: error.response.status,
+            data: error.response.data,
+            headers: error.response.headers
+          };
+          console.error('API Error response:', error.response.status, error.response.data);
+          
+          // Check for token expiration in response
+          if (error.response.status === 401) {
+            debugInfo.message = 'Authentication token has expired or is invalid';
+          }
+        } else if (error.request) {
+          // Request was made but no response received
+          debugInfo.details = {
+            request: 'Request was made but no response was received'
+          };
+          console.error('No response received:', error.request);
+        } else {
+          // Something else happened while setting up the request
+          debugInfo.details = {
+            message: error.message
+          };
+          console.error('Error setting up request:', error.message);
         }
       } else {
-        debugInfo.message = error instanceof Error ? error.message : 'Unknown error occurred';
+        // Non-Axios error
+        debugInfo.message = error instanceof Error ? error.message : 'Unknown error';
+        debugInfo.details = error;
+        console.error('Non-axios error:', error);
       }
       
       return { success: false, debug: debugInfo };

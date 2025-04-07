@@ -1,15 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { BlueSkyUser, FollowerAnalysisResult, DebugInfo } from '../../services/blueskyAPI';
-import { analyzeFollowers, batchUnfollowUsers, batchUnfollowUsersWithProgress, batchFollowUsers, batchFollowUsersWithProgress, getAllFollowers, getAllFollowing, getOperationProgress, clearOperationProgress, authenticateUser, saveSession, getSession, validateSession, clearSession } from '../../services/blueskyAPI';
+import { analyzeFollowers, batchUnfollowUsers, batchUnfollowUsersWithProgress, batchFollowUsers, batchFollowUsersWithProgress, getAllFollowers, getAllFollowing, getOperationProgress, clearOperationProgress, authenticateUser, saveSession, getSession, validateSession, clearSession, searchUsers } from '../../services/blueskyAPI';
 import { useOperation } from '../../contexts/OperationContext';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Card from '../ui/Card';
 import UserListItem from '../ui/UserListItem';
-import { FiUser, FiUserCheck, FiUserMinus, FiUserPlus, FiX, FiAlertTriangle, FiExternalLink, FiInfo, FiCheck, FiUsers, FiMessageSquare, FiTarget, FiActivity } from 'react-icons/fi';
+import { FiUser, FiUserCheck, FiUserMinus, FiUserPlus, FiX, FiAlertTriangle, FiExternalLink, FiInfo, FiCheck, FiUsers, FiMessageSquare, FiTarget, FiActivity, FiTrash, FiShield, FiSearch, FiPlus } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import { useLanguage } from '../../contexts/LanguageContext';
 import TargetFollow from './TargetFollow';
+import UnfollowAll from './UnfollowAll';
 
 const FollowerAnalysis: React.FC = () => {
   const { operation, togglePause } = useOperation();
@@ -17,7 +18,7 @@ const FollowerAnalysis: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [followersData, setFollowersData] = useState<FollowerAnalysisResult | null>(null);
-  const [activeTab, setActiveTab] = useState<'notFollowingBack' | 'notFollowedBack' | 'mutuals' | 'targetFollow'>('notFollowingBack');
+  const [activeTab, setActiveTab] = useState<'notFollowingBack' | 'notFollowedBack' | 'mutuals' | 'targetFollow' | 'unfollowAll'>('notFollowingBack');
   const [showUnfollowModal, setShowUnfollowModal] = useState(false);
   const [showFollowModal, setShowFollowModal] = useState(false);
   const [password, setPassword] = useState('');
@@ -52,12 +53,21 @@ const FollowerAnalysis: React.FC = () => {
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [showLoginForm, setShowLoginForm] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const usersPerPage = 50;
+  const usersPerPage = 20; // Her sayfada 20 kullanıcı gösterilsin
   const { t, language } = useLanguage();
   const [resetFlag, setResetFlag] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const [sessionDebugInfo, setSessionDebugInfo] = useState<any>(null);
   const [initialLoading, setInitialLoading] = useState(true);
+  // AbortController referansını tutmak için useRef ekle
+  const abortControllerRef = useRef<AbortController | null>(null);
+  // Öncelikle state değişkenlerini ekle
+  const [selectedNotFollowingBackUsers, setSelectedNotFollowingBackUsers] = useState<{[key: string]: boolean}>({});
+  const [showNotFollowingSelection, setShowNotFollowingSelection] = useState(false);
+  const [whitelistedNotFollowingUsers, setWhitelistedNotFollowingUsers] = useState<BlueSkyUser[]>([]);
+  const [searchQueryNotFollowing, setSearchQueryNotFollowing] = useState('');
+  const [isSearchingNotFollowing, setIsSearchingNotFollowing] = useState(false);
+  const [searchResultsNotFollowing, setSearchResultsNotFollowing] = useState<BlueSkyUser[]>([]);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -195,63 +205,111 @@ const FollowerAnalysis: React.FC = () => {
     clearSession();
   };
 
-  const handleBatchUnfollow = async () => {
-    // Önce aktif oturum var mı kontrol et
+  // initiateUnfollowWithWhitelist fonksiyonunu güncelle
+  const initiateUnfollowWithWhitelist = async () => {
+    // Aktif oturum var mı kontrol et
     const validSession = await validateSession();
     
-    // Eğer aktif oturum yoksa ve şifre girilmemişse hata göster
-    if (!validSession && !password) {
-      setUnfollowError(t.passwordRequired);
+    // Aktif oturum yoksa ve kullanıcı girişi yapmamışsa hata göster
+    if (!validSession && !getSession()) {
+      setUnfollowError(language === 'TR' ? 'Önce giriş yapmalısınız' : 'You need to log in first');
       return;
     }
 
-    if (!followersData?.notFollowingBack.length) {
-      setUnfollowError(t.noUsersToUnfollow);
+    if (!followersData || followersData.notFollowingBack.length === 0) {
+      setUnfollowError(language === 'TR' ? 'Takipten çıkarılacak kullanıcı bulunamadı' : 'No users to unfollow');
       return;
     }
 
+    // Önceki istek varsa iptal et
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // Yeni AbortController oluştur
+    abortControllerRef.current = new AbortController();
+    
     setUnfollowInProgress(true);
     setUnfollowError(null);
     setUnfollowSuccess(null);
     setDebugInfo(null);
-    setUnfollowProgress({ completed: 0, total: followersData.notFollowingBack.length });
+    
+    // Whitelist'te olmayan kullanıcıları filtrele
+    const usersToUnfollow = followersData.notFollowingBack.filter(
+      user => !whitelistedNotFollowingUsers.some(whitelisted => whitelisted.did === user.did)
+    );
+    
+    setUnfollowProgress({ completed: 0, total: usersToUnfollow.length });
 
     try {
+      console.log('Starting batch unfollow operation');
+      
       const unfollowResult = await batchUnfollowUsersWithProgress(
         username,
-        validSession ? null : password,
-        followersData.notFollowingBack,
+        null, // Şifre değil session kullan
+        usersToUnfollow,
         0,
         (completed, total, lastError) => {
           setUnfollowProgress({ completed, total });
           if (lastError) {
             setDebugInfo(lastError);
           }
-        }
+        },
+        abortControllerRef.current.signal
       );
+      
+      console.log('Batch unfollow operation completed', unfollowResult);
       
       setUnfollowSuccess({
         success: unfollowResult.success,
         failed: unfollowResult.failed
       });
       
-      // Set last error if available
+      // Son hata varsa göster
       if (unfollowResult.errors && unfollowResult.errors.length > 0) {
         setDebugInfo(unfollowResult.errors[unfollowResult.errors.length - 1]);
       }
       
-      // Refresh analysis after unfollowing
+      // Analizi yenile
       if (unfollowResult.success > 0) {
         const newAnalysis = await analyzeFollowers(username);
         setFollowersData(newAnalysis);
       }
-    } catch (err) {
-      setUnfollowError(err instanceof Error ? err.message : t.unfollowFailed);
+    } catch (err: any) {
+      console.error('Batch unfollow error:', err);
+      
+      // İptal edilme durumu için özel mesaj
+      if (err.name === 'AbortError' || err.message === 'canceled') {
+        setUnfollowError(language === 'TR' ? 'İşlem iptal edildi' : 'Operation was canceled');
+      } else {
+        setUnfollowError(err instanceof Error ? err.message : 'Unfollow operation failed');
+      }
     } finally {
       setUnfollowInProgress(false);
-      // Don't clear password anymore to retain it for future operations
+      setShowAppPasswordInfo(false);
+      // Controller'ı temizle
+      abortControllerRef.current = null;
     }
   };
+
+  // İşlemi iptal etme fonksiyonu ekle
+  const cancelUnfollowOperation = () => {
+    if (abortControllerRef.current) {
+      console.log('Canceling unfollow operation...');
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setShowUnfollowModal(false);
+  };
+
+  // Komponentin unmount olması durumunda da iptal et
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   const handleBatchFollow = async () => {
     // Önce aktif oturum var mı kontrol et
@@ -548,6 +606,117 @@ const FollowerAnalysis: React.FC = () => {
       );
     };
 
+    // Not Following Back tab with whitelist UI
+    if (activeTab === 'notFollowingBack') {
+      return (
+        <div>
+          {/* Kullanıcı Arama Alanı */}
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-3 flex items-center">
+              <FiShield className="mr-2" />
+              {language === 'TR' ? 'Korumak İstediğiniz Hesapları Arayın' : 'Search Accounts to Whitelist'}
+            </h3>
+            <div className="flex space-x-2 mb-3">
+              <Input
+                placeholder={language === 'TR' ? "Kullanıcı adı ile ara..." : "Search by username..."}
+                value={searchQueryNotFollowing}
+                onChange={(e) => setSearchQueryNotFollowing(e.target.value)}
+                className="flex-1"
+              />
+              <Button
+                onClick={handleSearchNotFollowing}
+                variant="secondary"
+                isLoading={isSearchingNotFollowing}
+                className="flex items-center"
+              >
+                <FiSearch className="mr-2" />
+                {language === 'TR' ? 'Ara' : 'Search'}
+              </Button>
+            </div>
+            
+            {/* Arama Sonuçları */}
+            {searchResultsNotFollowing.length > 0 && (
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 mb-4">
+                <h4 className="text-sm font-medium mb-2">
+                  {language === 'TR' ? 'Arama Sonuçları' : 'Search Results'}
+                </h4>
+                <div className="max-h-60 overflow-y-auto border rounded-lg divide-y dark:divide-gray-700">
+                  {searchResultsNotFollowing.map(user => (
+                    <div key={user.did} className="flex items-center justify-between p-3">
+                      <div className="flex items-center">
+                        {user.avatar ? (
+                          <img src={user.avatar} alt={user.handle} className="w-8 h-8 rounded-full mr-2" />
+                        ) : (
+                          <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full mr-2 flex items-center justify-center">
+                            <FiUser className="text-gray-500 dark:text-gray-400" />
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-medium text-sm">{user.displayName || user.handle}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">@{user.handle}</p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        className="text-xs px-2 py-1"
+                        onClick={() => addToWhitelistNotFollowing(user)}
+                      >
+                        <FiPlus className="mr-1" /> {language === 'TR' ? 'Ekle' : 'Add'}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Whitelist */}
+            {whitelistedNotFollowingUsers.length > 0 && (
+              <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 mb-4">
+                <h4 className="text-sm font-medium mb-2 flex items-center">
+                  <FiShield className="mr-2 text-green-600 dark:text-green-400" />
+                  {language === 'TR' ? 'Korunan Hesaplar' : 'Whitelisted Accounts'} ({whitelistedNotFollowingUsers.length})
+                </h4>
+                <div className="max-h-60 overflow-y-auto border rounded-lg">
+                  {whitelistedNotFollowingUsers.map(user => renderUserItemNotFollowing(user, true))}
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Kullanıcı listesi başlığı */}
+          <h3 className="text-lg font-semibold mb-3 flex items-center">
+            <FiUserMinus className="mr-2" />
+            {language === 'TR' ? 'Takip Etmeyen Hesaplar' : 'Not Following Back'}
+          </h3>
+          
+          {/* Takipten Çık butonunun bulunduğu kısmı, onClick={initiateUnfollowWithWhitelist} yerine aşağıdaki gibi değiştir */}
+          <div className="mb-4 flex justify-end">
+            <Button
+              className="flex items-center"
+              variant="danger"
+              onClick={showUnfollowModalForWhitelist}
+            >
+              <FiUserMinus className="mr-2" /> 
+              {language === 'TR' 
+                ? `${whitelistedNotFollowingUsers.length > 0 && followersData
+                    ? `${followersData.notFollowingBack.length - whitelistedNotFollowingUsers.length} Hesabı` 
+                    : 'Tümünü'} Takipten Çık` 
+                : `Unfollow ${whitelistedNotFollowingUsers.length > 0 && followersData
+                    ? `${followersData.notFollowingBack.length - whitelistedNotFollowingUsers.length} Accounts` 
+                    : 'All'}`}
+            </Button>
+          </div>
+          
+          {/* Paginated user list */}
+          <div className="border rounded-lg divide-y dark:divide-gray-700 mb-3">
+            {currentUsers.map(user => renderUserItemNotFollowing(user))}
+          </div>
+          
+          {renderPagination()}
+        </div>
+      );
+    }
+
     // Mutuals tab with selection UI
     if (activeTab === 'mutuals' && showMutualsSelection) {
       return (
@@ -638,12 +807,14 @@ const FollowerAnalysis: React.FC = () => {
       );
     }
 
-    // Default user list without selection UI
+    // Default user list with pagination (for other tabs or when no selection mode)
     return (
       <div>
         <div className="divide-y divide-gray-200 dark:divide-gray-700">
           {currentUsers.map((user, index) => (
-            <UserListItem key={user.did} user={user} index={indexOfFirstUser + index} />
+            <div key={user.did} className="py-2">
+              <UserListItem user={user} index={indexOfFirstUser + index} />
+            </div>
           ))}
         </div>
         {renderPagination()}
@@ -964,6 +1135,97 @@ const FollowerAnalysis: React.FC = () => {
     );
   };
 
+  // Arama fonksiyonu ekle
+  const handleSearchNotFollowing = async () => {
+    if (!searchQueryNotFollowing.trim() || !followersData) return;
+    
+    setIsSearchingNotFollowing(true);
+    try {
+      const results = await searchUsers(searchQueryNotFollowing);
+      // Sadece takip etmeyen kullanıcıları filtrele
+      const filteredResults = results.filter(user => 
+        followersData.notFollowingBack.some(notFollowing => notFollowing.did === user.did)
+      );
+      setSearchResultsNotFollowing(filteredResults);
+    } catch (error) {
+      console.error('Search error:', error);
+    } finally {
+      setIsSearchingNotFollowing(false);
+    }
+  };
+
+  // Whitelist'e kullanıcı ekleme
+  const addToWhitelistNotFollowing = (user: BlueSkyUser) => {
+    if (whitelistedNotFollowingUsers.some(whitelisted => whitelisted.did === user.did)) {
+      return; // Zaten listede varsa ekleme
+    }
+    
+    setWhitelistedNotFollowingUsers(prev => [...prev, user]);
+    
+    // Arama sonuçlarını temizle
+    setSearchResultsNotFollowing([]);
+    setSearchQueryNotFollowing('');
+  };
+
+  // Whitelist'ten kullanıcı çıkarma
+  const removeFromWhitelistNotFollowing = (user: BlueSkyUser) => {
+    setWhitelistedNotFollowingUsers(prev => 
+      prev.filter(whitelisted => whitelisted.did !== user.did)
+    );
+  };
+
+  // Not Following Back kullanıcıları için öğe render fonksiyonu
+  const renderUserItemNotFollowing = (user: BlueSkyUser, isWhitelisted: boolean = false) => {
+    return (
+      <div key={user.did} className="flex items-center justify-between p-3">
+        <div className="flex items-center">
+          {user.avatar ? (
+            <img src={user.avatar} alt={user.handle} className="w-8 h-8 rounded-full mr-2" />
+          ) : (
+            <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full mr-2 flex items-center justify-center">
+              <FiUser className="text-gray-500 dark:text-gray-400" />
+            </div>
+          )}
+          <div>
+            <p className="font-medium text-sm">{user.displayName || user.handle}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">@{user.handle}</p>
+          </div>
+        </div>
+        
+        {isWhitelisted ? (
+          <Button
+            variant="outline"
+            className="text-xs px-2 py-1"
+            onClick={() => removeFromWhitelistNotFollowing(user)}
+          >
+            <FiX className="mr-1" /> {language === 'TR' ? 'Kaldır' : 'Remove'}
+          </Button>
+        ) : (
+          <Button
+            variant="secondary"
+            className="text-xs px-2 py-1"
+            onClick={() => addToWhitelistNotFollowing(user)}
+          >
+            <FiShield className="mr-1" /> {language === 'TR' ? 'Koruma Ekle' : 'Whitelist'}
+          </Button>
+        )}
+      </div>
+    );
+  };
+
+  // showUnfollowModalForWhitelist fonksiyonunu ekle
+  const showUnfollowModalForWhitelist = () => {
+    if (!followersData || !followersData.notFollowingBack) return;
+    
+    // Log white-listed kullanıcı bilgilerini
+    console.log(`Total users: ${followersData.notFollowingBack.length}, Whitelisted: ${whitelistedNotFollowingUsers.length}, To unfollow: ${followersData.notFollowingBack.length - whitelistedNotFollowingUsers.length}`);
+    
+    // Modalı göster
+    setShowUnfollowModal(true);
+    // Artık şifre bilgisine ihtiyaç duymuyoruz
+    setShowAppPasswordInfo(false);
+  };
+
   return (
     <div className="relative">
       <div className="w-full max-w-4xl mx-auto p-4">
@@ -1089,7 +1351,7 @@ const FollowerAnalysis: React.FC = () => {
                         onClick={() => setActiveTab('notFollowingBack')}
                       >
                         <FiUserMinus className="mr-2" />
-                        <span>{t.notFollowingBack} ({followersData.notFollowingBack.length})</span>
+                        <span>{t.notFollowingBack} ({followersData?.notFollowingBack.length || 0})</span>
                       </button>
 
                       <button
@@ -1101,7 +1363,7 @@ const FollowerAnalysis: React.FC = () => {
                         onClick={() => setActiveTab('notFollowedBack')}
                       >
                         <FiUserPlus className="mr-2" />
-                        <span>{t.notFollowedBack} ({followersData.notFollowedBack.length})</span>
+                        <span>{t.notFollowedBack} ({followersData?.notFollowedBack.length || 0})</span>
                       </button>
 
                       <button
@@ -1113,7 +1375,7 @@ const FollowerAnalysis: React.FC = () => {
                         onClick={() => setActiveTab('mutuals')}
                       >
                         <FiUserCheck className="mr-2" />
-                        <span>{t.mutuals} ({followersData.mutuals.length})</span>
+                        <span>{t.mutuals} ({followersData?.mutuals.length || 0})</span>
                       </button>
                       
                       <button
@@ -1127,10 +1389,22 @@ const FollowerAnalysis: React.FC = () => {
                         <FiTarget className="mr-2" />
                         <span>{t.targetFollow}</span>
                       </button>
+
+                      <button
+                        className={`py-2 px-4 mr-2 flex items-center ${
+                          activeTab === 'unfollowAll'
+                            ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
+                            : 'text-gray-600 dark:text-gray-400'
+                        }`}
+                        onClick={() => setActiveTab('unfollowAll')}
+                      >
+                        <FiTrash className="mr-2" />
+                        <span>{language === 'TR' ? 'Tümünü Takipten Çıkar' : 'Unfollow All'}</span>
+                      </button>
                     </div>
                   </div>
 
-                  {activeTab === 'notFollowingBack' && followersData.notFollowingBack.length > 0 && (
+                  {activeTab === 'notFollowingBack' && followersData?.notFollowingBack.length > 0 && (
                     <div className="mb-4 flex justify-end">
                       <Button
                         className="flex items-center"
@@ -1142,7 +1416,7 @@ const FollowerAnalysis: React.FC = () => {
                     </div>
                   )}
 
-                  {activeTab === 'notFollowedBack' && followersData.notFollowedBack.length > 0 && (
+                  {activeTab === 'notFollowedBack' && followersData?.notFollowedBack.length > 0 && (
                     <div className="mb-4 flex justify-end">
                       <Button
                         className="flex items-center"
@@ -1170,10 +1444,11 @@ const FollowerAnalysis: React.FC = () => {
                     </div>
                   )}
 
-                  {activeTab === 'notFollowingBack' && renderUserList(followersData.notFollowingBack)}
-                  {activeTab === 'notFollowedBack' && renderUserList(followersData.notFollowedBack)}
-                  {activeTab === 'mutuals' && renderUserList(followersData.mutuals)}
+                  {activeTab === 'notFollowingBack' && renderUserList(followersData?.notFollowingBack || [])}
+                  {activeTab === 'notFollowedBack' && renderUserList(followersData?.notFollowedBack || [])}
+                  {activeTab === 'mutuals' && renderUserList(followersData?.mutuals || [])}
                   {activeTab === 'targetFollow' && <TargetFollow />}
+                  {activeTab === 'unfollowAll' && <UnfollowAll />}
                 </Card>
               </motion.div>
             )}
@@ -1188,7 +1463,7 @@ const FollowerAnalysis: React.FC = () => {
                 >
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                      {language === 'TR' ? 'Takip Etmeyenleri Takipten Çık' : 'Unfollow Non-Followers'}
+                      {t.unfollowAllNonFollowers}
                     </h3>
                     <button
                       onClick={() => setShowUnfollowModal(false)}
@@ -1200,10 +1475,24 @@ const FollowerAnalysis: React.FC = () => {
 
                   <p className="mb-4 text-gray-700 dark:text-gray-300">
                     {language === 'TR' 
-                      ? `Sizi takip etmeyen ${followersData?.notFollowingBack.length} hesabı takipten çıkmak üzeresiniz. Bu işlem geri alınamaz.`
-                      : `You are about to unfollow ${followersData?.notFollowingBack.length} accounts that don't follow you back. This action cannot be undone.`
+                      ? `${followersData && whitelistedNotFollowingUsers.length > 0 
+                          ? followersData.notFollowingBack.length - whitelistedNotFollowingUsers.length 
+                          : followersData?.notFollowingBack.length} hesabı takipten çıkmak üzeresiniz. Bu işlem geri alınamaz.`
+                      : `You are about to unfollow ${followersData && whitelistedNotFollowingUsers.length > 0 
+                          ? followersData.notFollowingBack.length - whitelistedNotFollowingUsers.length 
+                          : followersData?.notFollowingBack.length} accounts. This action cannot be undone.`
                     }
                   </p>
+                  
+                  {whitelistedNotFollowingUsers.length > 0 && (
+                    <p className="mb-4 text-gray-700 dark:text-gray-300 flex items-center">
+                      <FiShield className="mr-2 text-green-600 dark:text-green-400" />
+                      {language === 'TR'
+                        ? `${whitelistedNotFollowingUsers.length} korumalı hesap takipten çıkarılmayacak.`
+                        : `${whitelistedNotFollowingUsers.length} whitelisted accounts will be preserved.`
+                      }
+                    </p>
+                  )}
 
                   {unfollowError && (
                     <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-200 rounded text-sm">
@@ -1212,11 +1501,40 @@ const FollowerAnalysis: React.FC = () => {
                   )}
 
                   {unfollowSuccess && (
-                    <div className="mb-4 p-3 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-200 rounded text-sm">
-                      {language === 'TR'
-                        ? `${unfollowSuccess.success} hesap başarıyla takipten çıkarıldı.${unfollowSuccess.failed > 0 ? ` ${unfollowSuccess.failed} hesap takipten çıkarılamadı.` : ''}`
-                        : `Successfully unfollowed ${unfollowSuccess.success} accounts.${unfollowSuccess.failed > 0 ? ` Failed to unfollow ${unfollowSuccess.failed} accounts.` : ''}`
-                      }
+                    <div className={`mb-4 p-3 ${
+                        unfollowSuccess.success > 0 && unfollowSuccess.failed === 0 
+                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-200' 
+                          : unfollowSuccess.success === 0 && unfollowSuccess.failed > 0
+                            ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-200'
+                            : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-200'
+                      } rounded text-sm`}>
+                      <div className="flex items-start">
+                        {unfollowSuccess.success > 0 && unfollowSuccess.failed === 0 ? (
+                          <FiCheck className="mr-2 mt-0.5 text-green-600 dark:text-green-400" />
+                        ) : unfollowSuccess.success === 0 && unfollowSuccess.failed > 0 ? (
+                          <FiAlertTriangle className="mr-2 mt-0.5 text-red-600 dark:text-red-400" />
+                        ) : (
+                          <FiInfo className="mr-2 mt-0.5 text-yellow-600 dark:text-yellow-400" />
+                        )}
+                        <div>
+                          {language === 'TR'
+                            ? (
+                                <>
+                                  {unfollowSuccess.success > 0 && <span className="font-medium">{unfollowSuccess.success} hesap başarıyla takipten çıkarıldı.</span>}
+                                  {unfollowSuccess.failed > 0 && <span className="font-medium">{unfollowSuccess.success > 0 ? ' ' : ''}{unfollowSuccess.failed} hesap takipten çıkarılamadı.</span>}
+                                  {unfollowSuccess.success === 0 && unfollowSuccess.failed > 0 && <div className="mt-1">Tekrar denemek için aşağıdaki butona tıklayın.</div>}
+                                </>
+                              )
+                            : (
+                                <>
+                                  {unfollowSuccess.success > 0 && <span className="font-medium">Successfully unfollowed {unfollowSuccess.success} accounts.</span>}
+                                  {unfollowSuccess.failed > 0 && <span className="font-medium">{unfollowSuccess.success > 0 ? ' ' : ''}Failed to unfollow {unfollowSuccess.failed} accounts.</span>}
+                                  {unfollowSuccess.success === 0 && unfollowSuccess.failed > 0 && <div className="mt-1">Click the button below to try again.</div>}
+                                </>
+                              )
+                          }
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -1236,39 +1554,44 @@ const FollowerAnalysis: React.FC = () => {
                           : `Processing ${unfollowProgress.completed} of ${unfollowProgress.total}`
                         }
                       </p>
+                      <p className="text-sm text-blue-600 dark:text-blue-400 text-center mt-1">
+                        {language === 'TR'
+                          ? "Gerçek takipten çıkarma işlemi yürütülüyor, lütfen bekleyin..."
+                          : "Real unfollow operation in progress, please wait..."
+                        }
+                      </p>
+                      <div className="mt-3 flex justify-center">
+                        <Button
+                          variant="secondary"
+                          className="px-4 py-2 text-sm"
+                          onClick={cancelUnfollowOperation}
+                        >
+                          {language === 'TR' ? 'İşlemi İptal Et' : 'Cancel Operation'}
+                        </Button>
+                      </div>
                     </div>
                   ) : (
                     <div className="flex flex-col space-y-4">
-                      {/* Şifre girişi sadece oturum yoksa gösterilsin */}
-                      {!getSession() && (
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            {t.blueskyPassword}
-                          </label>
-                          <Input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="App Password"
-                          />
-                        </div>
-                      )}
+                      {/* Şifre alanı kaldırıldı */}
                       
                       <div className="flex items-center space-x-4">
                         <Button
                           variant="secondary"
                           className="flex-1"
-                          onClick={() => setShowUnfollowModal(false)}
+                          onClick={cancelUnfollowOperation}
                         >
                           {language === 'TR' ? 'İptal' : 'Cancel'}
                         </Button>
                         <Button
-                          onClick={handleBatchUnfollow}
+                          onClick={initiateUnfollowWithWhitelist}
                           variant="danger"
                           className="flex-1"
                           isLoading={unfollowInProgress}
                         >
-                          {language === 'TR' ? 'Tümünü Takipten Çık' : 'Unfollow All'}
+                          {unfollowSuccess ? 
+                            (language === 'TR' ? 'Tekrar Dene' : 'Try Again') : 
+                            (language === 'TR' ? 'Tümünü Takipten Çık' : 'Unfollow All')
+                          }
                         </Button>
                       </div>
                     </div>
@@ -1325,11 +1648,40 @@ const FollowerAnalysis: React.FC = () => {
                   )}
 
                   {followSuccess && (
-                    <div className="mb-4 p-3 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-200 rounded text-sm">
-                      {language === 'TR'
-                        ? `${followSuccess.success} hesap başarıyla takip edildi.${followSuccess.failed > 0 ? ` ${followSuccess.failed} hesap takip edilemedi.` : ''}`
-                        : `Successfully followed ${followSuccess.success} accounts.${followSuccess.failed > 0 ? ` Failed to follow ${followSuccess.failed} accounts.` : ''}`
-                      }
+                    <div className={`mb-4 p-3 ${
+                        followSuccess.success > 0 && followSuccess.failed === 0 
+                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-200' 
+                          : followSuccess.success === 0 && followSuccess.failed > 0
+                            ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-200'
+                            : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-200'
+                      } rounded text-sm`}>
+                      <div className="flex items-start">
+                        {followSuccess.success > 0 && followSuccess.failed === 0 ? (
+                          <FiCheck className="mr-2 mt-0.5 text-green-600 dark:text-green-400" />
+                        ) : followSuccess.success === 0 && followSuccess.failed > 0 ? (
+                          <FiAlertTriangle className="mr-2 mt-0.5 text-red-600 dark:text-red-400" />
+                        ) : (
+                          <FiInfo className="mr-2 mt-0.5 text-yellow-600 dark:text-yellow-400" />
+                        )}
+                        <div>
+                          {language === 'TR'
+                            ? (
+                                <>
+                                  {followSuccess.success > 0 && <span className="font-medium">{followSuccess.success} hesap başarıyla takip edildi.</span>}
+                                  {followSuccess.failed > 0 && <span className="font-medium">{followSuccess.success > 0 ? ' ' : ''}{followSuccess.failed} hesap takip edilemedi.</span>}
+                                  {followSuccess.success === 0 && followSuccess.failed > 0 && <div className="mt-1">Tekrar denemek için aşağıdaki butona tıklayın.</div>}
+                                </>
+                              )
+                            : (
+                                <>
+                                  {followSuccess.success > 0 && <span className="font-medium">Successfully followed {followSuccess.success} accounts.</span>}
+                                  {followSuccess.failed > 0 && <span className="font-medium">{followSuccess.success > 0 ? ' ' : ''}Failed to follow {followSuccess.failed} accounts.</span>}
+                                  {followSuccess.success === 0 && followSuccess.failed > 0 && <div className="mt-1">Click the button below to try again.</div>}
+                                </>
+                              )
+                          }
+                        </div>
+                      </div>
                     </div>
                   )}
 
