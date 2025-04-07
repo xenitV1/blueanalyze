@@ -113,7 +113,7 @@ const enTranslations: Translations = {
   resultsFor: 'Results for',
   batchFollowUsers: 'Batch Follow Users',
   unfollowAllNonFollowers: 'Unfollow All Non-Followers',
-  whatIsAppPassword: 'What is an App Password?',
+  whatIsAppPassword: 'IMPORTANT: What is an App Password?',
   hideAppPasswordInfo: 'Hide App Password info',
   
   // Target Follow
@@ -192,7 +192,7 @@ const trTranslations: Translations = {
   resultsFor: 'Sonuçlar',
   batchFollowUsers: 'Toplu Takip Et',
   unfollowAllNonFollowers: 'Takip Etmeyenleri Takipten Çık',
-  whatIsAppPassword: 'App Password nedir?',
+  whatIsAppPassword: 'ÖNEMLİ: App Password nedir?',
   hideAppPasswordInfo: 'App Password bilgisini gizle',
   
   // Target Follow

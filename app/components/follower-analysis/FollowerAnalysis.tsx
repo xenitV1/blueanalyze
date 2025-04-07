@@ -6,7 +6,7 @@ import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Card from '../ui/Card';
 import UserListItem from '../ui/UserListItem';
-import { FiUser, FiUserCheck, FiUserMinus, FiUserPlus, FiX, FiAlertTriangle, FiExternalLink, FiInfo, FiCheck, FiUsers, FiMessageSquare, FiTarget, FiActivity, FiTrash, FiShield, FiSearch, FiPlus } from 'react-icons/fi';
+import { FiUser, FiUserCheck, FiUserMinus, FiUserPlus, FiX, FiAlertTriangle, FiExternalLink, FiInfo, FiCheck, FiUsers, FiMessageSquare, FiTarget, FiActivity, FiTrash, FiShield, FiSearch, FiPlus, FiImage, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import { useLanguage } from '../../contexts/LanguageContext';
 import TargetFollow from './TargetFollow';
@@ -14,7 +14,13 @@ import UnfollowAll from './UnfollowAll';
 
 const FollowerAnalysis: React.FC = () => {
   const { operation, togglePause } = useOperation();
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState(() => {
+    // Try to get the last username from localStorage
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('lastUsername') || '';
+    }
+    return '';
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [followersData, setFollowersData] = useState<FollowerAnalysisResult | null>(null);
@@ -31,6 +37,8 @@ const FollowerAnalysis: React.FC = () => {
   const [unfollowSuccess, setUnfollowSuccess] = useState<{success: number, failed: number} | null>(null);
   const [followSuccess, setFollowSuccess] = useState<{success: number, failed: number} | null>(null);
   const [showAppPasswordInfo, setShowAppPasswordInfo] = useState(false);
+  const [showMobileImagesModal, setShowMobileImagesModal] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
   const [followSource, setFollowSource] = useState<'followers' | 'following'>('followers');
@@ -157,6 +165,11 @@ const FollowerAnalysis: React.FC = () => {
     if (!username) {
       setError('Please enter a Bluesky username');
       return;
+    }
+
+    // Save the username to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('lastUsername', username);
     }
 
     setIsLoading(true);
@@ -836,21 +849,29 @@ const FollowerAnalysis: React.FC = () => {
       <h4 className="font-bold mb-2">{language === 'TR' ? 'App Password oluşturma adımları:' : 'How to create an App Password:'}</h4>
       <ol className="list-decimal pl-5 space-y-2 text-sm">
         <li>{language === 'TR' ? 'Bluesky Ayarlar\'a gidin (mobil uygulama veya web üzerinden)' : 'Go to Bluesky Settings (via the mobile app or web)'}</li>
-        <li>{language === 'TR' ? '<strong>Gelişmiş</strong> &gt; <strong>App Passwords</strong> bölümüne gidin' : 'Navigate to <strong>Advanced</strong> &gt; <strong>App Passwords</strong>'}</li>
-        <li>{language === 'TR' ? '<strong>App Password Ekle</strong> butonuna tıklayın' : 'Click <strong>Add App Password</strong>'}</li>
-        <li>{language === 'TR' ? '"BlueSky Follower Analyzer" gibi bir etiket girin ve <strong>Oluştur</strong> butonuna tıklayın' : 'Enter a label like "BlueSky Follower Analyzer" and click <strong>Create</strong>'}</li>
+        <li>{language === 'TR' ? 'Gizlilik ve Güvenlik > Uygulama Şifreleri bölümüne gidin' : 'Navigate to Privacy & Security > App Passwords'}</li>
+        <li>{language === 'TR' ? 'Şifre Ekle butonuna tıklayın' : 'Click Add App Password'}</li>
+        <li>{language === 'TR' ? '"BlueSky Follower Analyzer" gibi bir etiket girin ve Oluştur butonuna tıklayın' : 'Enter a label like "BlueSky Follower Analyzer" and click Create'}</li>
         <li>{language === 'TR' ? 'Oluşturulan şifreyi kopyalayın ve buraya yapıştırın' : 'Copy the generated password and paste it here'}</li>
       </ol>
       <Button
-        className="mt-4 flex items-center"
+        className="mt-4 flex items-center bg-orange-400 hover:bg-orange-600 text-white w-full"
+        onClick={() => setShowMobileImagesModal(true)}
+      >
+        <FiImage className="mr-2" />
+        {language === 'TR' ? 'Nasıl yapılır?' : 'How to do it?'}
+      </Button>
+      <Button
+        className="mt-4 flex items-center bg-red-400 hover:bg-red-600 text-white w-full"
         onClick={openBlueskySite}
       >
         {language === 'TR' ? 'Bluesky App Password Ayarlarına Git' : 'Go to Bluesky App Password Settings'} <FiExternalLink className="ml-2" />
       </Button>
-      <p className="mt-4 text-xs">
-        <strong>{language === 'TR' ? 'Not:' : 'Note:'}</strong> {language === 'TR' 
-          ? 'App Password\'ler ana şifrenizi kullanmaktan daha güvenlidir. Hesabınıza sınırlı erişim sağlarlar ve istenildiği zaman iptal edilebilirler.'
-          : 'App Passwords are more secure than using your main password. They allow limited access to your account and can be revoked at any time.'}
+
+      <p className="mt-4 text-xs border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg animate-pulse">
+        <strong className="text-red-600 dark:text-red-400">{language === 'TR' ? 'Not:' : 'Note:'}</strong> {language === 'TR' 
+          ? 'App Password\'ler ana şifrenizi kullanmaktan daha güvenlidir. Hesabınıza sınırlı erişim sağlarlar ve istenildiği zaman iptal edilebilirler. Hesabınızın güvenliği için iki faktörlü kimlik doğrulama da açmayı unutmayın!'
+          : 'App Passwords are more secure than using your main password. They allow limited access to your account and can be revoked at any time. Do not forget to enable two-factor authentication for your account security!'}
       </p>
     </motion.div>
   );
@@ -1256,7 +1277,19 @@ const FollowerAnalysis: React.FC = () => {
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    onFocus={() => setShowAppPasswordInfo(false)}
                   />
+                  <div className="flex items-center gap-2 mt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowAppPasswordInfo(!showAppPasswordInfo)}
+                      className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 text-sm flex items-center"
+                    >
+                      <FiInfo className="mr-1" />
+                      {showAppPasswordInfo ? t.hideAppPasswordInfo : t.whatIsAppPassword}
+                    </button>
+                  </div>
+                  {showAppPasswordInfo && renderAppPasswordInfo()}
                   <div className="flex flex-wrap items-center gap-2 mt-4">
                     <Button
                       type="submit"
@@ -1954,6 +1987,80 @@ const FollowerAnalysis: React.FC = () => {
             
             {/* Feedback modal */}
             {showFeedbackModal && renderFeedbackModal()}
+
+            {/* Mobile Images Modal */}
+            {showMobileImagesModal && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full p-6"
+                >
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                      {language === 'TR' ? 'Nasıl yapılır?' : 'How to do it?'}
+                    </h3>
+                    <button
+                      onClick={() => {
+                        setShowMobileImagesModal(false);
+                        setCurrentImageIndex(0);
+                      }}
+                      className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                    >
+                      <FiX className="text-xl" />
+                    </button>
+                  </div>
+
+                  <div className="relative">
+                    <div className="relative aspect-[9/16] w-full max-w-md mx-auto">
+                      <img
+                        src={`/mobile/${currentImageIndex + 1}.${currentImageIndex + 1 === 5 ? 'jpeg' : 'PNG'}`}
+                        alt={`Mobile screenshot ${currentImageIndex + 1}`}
+                        className="w-full h-full object-contain rounded-lg"
+                      />
+                    </div>
+
+                    {/* Navigation Buttons */}
+                    <button
+                      onClick={() => setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : 6))}
+                      className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 bg-white dark:bg-gray-800 p-2 rounded-full shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      <FiChevronLeft className="text-xl" />
+                    </button>
+                    <button
+                      onClick={() => setCurrentImageIndex((prev) => (prev < 6 ? prev + 1 : 0))}
+                      className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 bg-white dark:bg-gray-800 p-2 rounded-full shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      <FiChevronRight className="text-xl" />
+                    </button>
+                  </div>
+
+                  {/* Image Counter */}
+                  <div className="mt-4 text-center text-sm text-gray-600 dark:text-gray-400">
+                    {currentImageIndex + 1} / 7
+                  </div>
+
+                  {/* Thumbnail Navigation */}
+                  <div className="mt-4 flex justify-center gap-2">
+                    {[1, 2, 3, 4, 5, 6, 7].map((num, index) => (
+                      <button
+                        key={num}
+                        onClick={() => setCurrentImageIndex(index)}
+                        className={`w-12 h-12 rounded overflow-hidden ${
+                          currentImageIndex === index ? 'ring-2 ring-blue-500' : ''
+                        }`}
+                      >
+                        <img
+                          src={`/mobile/${num}.${num === 5 ? 'jpeg' : 'PNG'}`}
+                          alt={`Thumbnail ${num}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              </div>
+            )}
           </motion.div>
         )}
       </div>
