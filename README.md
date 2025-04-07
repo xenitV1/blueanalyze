@@ -2,6 +2,8 @@
 
 BlueAnalyze is a comprehensive follower analysis tool developed for Bluesky users. It helps you analyze your follow relationships, identify users who don't follow you back, and strategically manage your account.
 
+[![Deploy to Netlify](https://github.com/vortic-0/blueanalyze/actions/workflows/main.yml/badge.svg)](https://github.com/vortic-0/blueanalyze/deployments/production)
+
 ![BlueAnalyze Logo](public/blueanalyze.png)
 
 ## 🚀 Features
