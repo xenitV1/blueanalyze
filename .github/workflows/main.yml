@@ -35,7 +35,6 @@ jobs:
         with:
           publish-dir: ./build/client # or your output folder (e.g., build, out, etc.)
           production-branch: master
-          github-token: ${{ secrets.GITHUB_TOKEN }}
           deploy-message: "Deployed via GitHub Actions"
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
