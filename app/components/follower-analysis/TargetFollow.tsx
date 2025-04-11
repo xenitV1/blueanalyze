@@ -9,6 +9,7 @@ import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Card from '../ui/Card';
 import axios from 'axios';
+import * as idb from '../../services/indexedDBService';
 
 interface TargetUserCardProps {
   user: BlueSkyUser;
@@ -108,6 +109,9 @@ const TargetFollow: React.FC = () => {
   const isActiveProcess = operation.type === 'targetFollow' && operation.isProcessing;
   const isWaitingTimeout = operation.waitingTimeout;
   const isPaused = operation.isPaused;
+  
+  // Add abort controller reference for cancelling operations
+  const abortControllerRef = useRef<AbortController | null>(null);
   
   // Sayfa yüklendiğinde devam eden bir targetFollow işlemi var mı kontrol et
   useEffect(() => {
@@ -215,6 +219,42 @@ const TargetFollow: React.FC = () => {
     }
   };
   
+  // Get cached user follows to avoid redundant API calls
+  const getCachedUserFollows = async (): Promise<Set<string> | null> => {
+    try {
+      // Check if there's a session and get username
+      const session = await validateSession();
+      if (!session) return null;
+      
+      // Try to get cached analysis results
+      const cachedData = await idb.getAnalysisResults(session.did);
+      if (!cachedData || !cachedData.result) return null;
+      
+      // Create a Set of DIDs the user is already following
+      const followingDids = new Set<string>();
+      
+      // Add DIDs from mutuals
+      if (cachedData.result.mutuals) {
+        cachedData.result.mutuals.forEach((user: BlueSkyUser) => {
+          followingDids.add(user.did);
+        });
+      }
+      
+      // Add DIDs from notFollowingBack
+      if (cachedData.result.notFollowingBack) {
+        cachedData.result.notFollowingBack.forEach((user: BlueSkyUser) => {
+          followingDids.add(user.did);
+        });
+      }
+      
+      console.log(`Using cached following data with ${followingDids.size} follows`);
+      return followingDids;
+    } catch (error) {
+      console.error('Error getting cached follows:', error);
+      return null;
+    }
+  };
+  
   // Hedef kullanıcının takipçilerini analiz et
   const analyzeUserFollowers = async () => {
     if (!targetUser) return;
@@ -248,7 +288,28 @@ const TargetFollow: React.FC = () => {
       // Takipçi alımı bitti, şimdi filtreleme aşaması
       setAnalysisProgress({ phase: 'Takipçiler Filtreleniyor', completed: 0, total: 100 });
       
-      // Takip edilmeyen kullanıcıları filtrelemek için kullanıcının takip ettiklerini al
+      // İlk olarak önbelleğe alınmış takip edilen verilerini kontrol et
+      const cachedFollowingDids = await getCachedUserFollows();
+      
+      if (cachedFollowingDids) {
+        // Önbellekten takip edilen verilerini kullan
+        setAnalysisProgress({ phase: 'Önbellekten Filtreleniyor', completed: 0, total: 100 });
+        
+        // Takip edilmeyen kullanıcıları filtrele
+        const notFollowing = allFollowers.filter(user => !cachedFollowingDids.has(user.did));
+        
+        setFilteredUsers(notFollowing);
+        setTargetUsers(notFollowing);
+        setFollowCount(notFollowing.length);
+        setCustomFollowCount(notFollowing.length.toString());
+        
+        setShowFollowOptions(true);
+        setIsProcessing(false);
+        setIsAnalyzing(false);
+        return;
+      }
+      
+      // Önbellekte veri yoksa, API ile al
       if (hasSession) {
         const session = await validateSession();
         if (session) {
@@ -308,12 +369,14 @@ const TargetFollow: React.FC = () => {
           const notFollowing = allFollowers.filter(user => !followingDids.has(user.did));
           
           setFilteredUsers(notFollowing);
+          setTargetUsers(notFollowing);
           setFollowCount(notFollowing.length); // Varsayılan olarak tüm filtrelenmiş kullanıcıları takip et
           setCustomFollowCount(notFollowing.length.toString());
         }
       } else {
         // Oturum yoksa filtreleme yapmadan tüm takipçilerini göster
         setFilteredUsers(allFollowers);
+        setTargetUsers(allFollowers);
         setFollowCount(allFollowers.length);
         setCustomFollowCount(allFollowers.length.toString());
       }
@@ -361,7 +424,28 @@ const TargetFollow: React.FC = () => {
       // Takip edilen alımı bitti, şimdi filtreleme aşaması
       setAnalysisProgress({ phase: 'Takip Edilenler Filtreleniyor', completed: 0, total: 100 });
       
-      // Takip edilmeyen kullanıcıları filtrelemek için kullanıcının takip ettiklerini al
+      // İlk olarak önbelleğe alınmış takip edilen verilerini kontrol et
+      const cachedFollowingDids = await getCachedUserFollows();
+      
+      if (cachedFollowingDids) {
+        // Önbellekten takip edilen verilerini kullan
+        setAnalysisProgress({ phase: 'Önbellekten Filtreleniyor', completed: 0, total: 100 });
+        
+        // Takip edilmeyen kullanıcıları filtrele
+        const notFollowing = allFollowing.filter(user => !cachedFollowingDids.has(user.did));
+        
+        setFilteredUsers(notFollowing);
+        setTargetUsers(notFollowing);
+        setFollowCount(notFollowing.length);
+        setCustomFollowCount(notFollowing.length.toString());
+        
+        setShowFollowOptions(true);
+        setIsProcessing(false);
+        setIsAnalyzing(false);
+        return;
+      }
+      
+      // Önbellekte veri yoksa, API ile al
       if (hasSession) {
         const session = await validateSession();
         if (session) {
@@ -421,12 +505,14 @@ const TargetFollow: React.FC = () => {
           const notFollowing = allFollowing.filter(user => !followingDids.has(user.did));
           
           setFilteredUsers(notFollowing);
+          setTargetUsers(notFollowing);
           setFollowCount(notFollowing.length); // Varsayılan olarak tüm filtrelenmiş kullanıcıları takip et
           setCustomFollowCount(notFollowing.length.toString());
         }
       } else {
         // Oturum yoksa filtreleme yapmadan tüm takip ettiklerini göster
         setFilteredUsers(allFollowing);
+        setTargetUsers(allFollowing);
         setFollowCount(allFollowing.length);
         setCustomFollowCount(allFollowing.length.toString());
       }
@@ -496,6 +582,9 @@ const TargetFollow: React.FC = () => {
       followType: followType
     });
     
+    // Create a new AbortController instance
+    abortControllerRef.current = new AbortController();
+    
     try {
       // Kullanıcıları takip et
       const result = await batchFollowUsersWithProgress(
@@ -506,8 +595,8 @@ const TargetFollow: React.FC = () => {
         (completed, total, lastError) => {
           setFollowProgress({ completed, total });
           
-          // Operation context'i güncelle
-          updateProgress(completed, total, result.success, result.failed);
+          // Operation context'i güncelle - result henüz tanımlanmadığı için geçici değerler kullanıyoruz
+          updateProgress(completed, total, completed, 0, lastError);
           
           if (lastError) {
             console.log('Target follow operation error:', lastError);
@@ -519,7 +608,8 @@ const TargetFollow: React.FC = () => {
               setTimeoutStatus(true, 60); // 60 saniye bekle
             }
           }
-        }
+        },
+        abortControllerRef.current.signal // Pass the AbortSignal to the function
       );
       
       console.log('Target follow batch operation completed:', result);
@@ -542,12 +632,19 @@ const TargetFollow: React.FC = () => {
       setIsProcessComplete(true);
     } catch (error) {
       console.error('Follow process error:', error);
-      setError(error instanceof Error ? error.message : 'Takip işlemi başarısız oldu');
+      
+      // If the error was due to abortion (user clicked stop), don't show error message
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('Operation was aborted by user');
+      } else {
+        setError(error instanceof Error ? error.message : 'Takip işlemi başarısız oldu');
+      }
       
       // Hata durumunda operation'ı sıfırla
       resetOperation();
     } finally {
       setIsProcessing(false);
+      abortControllerRef.current = null;
     }
   };
   
@@ -588,7 +685,15 @@ const TargetFollow: React.FC = () => {
   
   // İşlemi durdur/devam ettir
   const handleTogglePause = () => {
+    // Toggle the pause state in the context
     togglePause();
+    
+    // If we're pausing and there's an active abort controller, abort the operation
+    if (!operation.isPaused && abortControllerRef.current) {
+      console.log('Aborting follow operation');
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
   };
   
   // İşlemi sıfırla

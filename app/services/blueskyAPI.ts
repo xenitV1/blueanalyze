@@ -1002,6 +1002,19 @@ export const batchFollowUsersWithProgress = async (
   signal?: AbortSignal
 ): Promise<{success: number, failed: number, errors: DebugInfo[], lastProcessedIndex: number}> => {
   try {
+    // Check if already aborted
+    if (signal?.aborted) {
+      console.log('Request was already aborted');
+      throw new Error('canceled');
+    }
+    
+    // AbortSignal eventListener ekle
+    if (signal) {
+      signal.addEventListener('abort', () => {
+        console.log('Abort signal received in batchFollowUsersWithProgress');
+      });
+    }
+    
     // First authenticate
     let authResponse;
     // Eğer şifre verilmediyse mevcut oturumu kullan
@@ -1042,6 +1055,12 @@ export const batchFollowUsersWithProgress = async (
     
     // Process each chunk
     for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+      // Check if operation was aborted
+      if (signal?.aborted) {
+        console.log('Operation was aborted during chunk processing');
+        throw new Error('canceled');
+      }
+      
       const chunk = chunks[chunkIndex];
       console.log(`Processing chunk ${chunkIndex + 1}/${chunks.length} with ${chunk.length} users`);
       
@@ -1060,61 +1079,99 @@ export const batchFollowUsersWithProgress = async (
       
       // Process users in this chunk with a queue
       for (let i = 0; i < chunk.length; i++) {
+        // Check if operation was aborted
+        if (signal?.aborted) {
+          console.log('Operation was aborted during user processing');
+          throw new Error('canceled');
+        }
+        
         const user = chunk[i];
         console.log(`Following user ${completedUsers + 1}/${total}: ${user.handle}`);
         
-        const { success, debug } = await followUser(authResponse.accessJwt, user.did);
-        
-        if (success) {
-          successCount++;
-        } else {
-          // Don't count "already following" as a failure
-          if (debug.message === 'Already following this user') {
-            console.log(`Already following user: ${user.handle}`);
+        try {
+          const { success, debug } = await followUser(authResponse.accessJwt, user.did);
+          
+          if (success) {
             successCount++;
           } else {
-            failedCount++;
-            errors.push(debug);
-            
-            // Only keep last 5 errors to avoid excessive memory usage
-            if (errors.length > 5) {
-              errors.shift();
-            }
-            
-            // Token süresi dolduysa işlemi durdur
-            if (debug.message === 'Auth token has expired' || debug.message === 'Authentication token has expired or is invalid') {
-              console.log('Token süresi doldu, işlem duraklatıldı');
-              // İşlem durumunu kaydet
-              await saveOperationProgress('follow', handle, completedUsers, total, users);
-              return {
-                success: successCount,
-                failed: failedCount,
-                errors,
-                lastProcessedIndex: completedUsers
-              };
+            // Don't count "already following" as a failure
+            if (debug.message === 'Already following this user') {
+              console.log(`Already following user: ${user.handle}`);
+              successCount++;
+            } else {
+              failedCount++;
+              errors.push(debug);
+              
+              // Only keep last 5 errors to avoid excessive memory usage
+              if (errors.length > 5) {
+                errors.shift();
+              }
+              
+              // Token süresi dolduysa işlemi durdur
+              if (debug.message === 'Auth token has expired' || debug.message === 'Authentication token has expired or is invalid') {
+                console.log('Token süresi doldu, işlem duraklatıldı');
+                // İşlem durumunu kaydet
+                await saveOperationProgress('follow', handle, completedUsers, total, users);
+                return {
+                  success: successCount,
+                  failed: failedCount,
+                  errors,
+                  lastProcessedIndex: completedUsers
+                };
+              }
             }
           }
-        }
-        
-        lastProcessedIndex = completedUsers;
-        completedUsers++;
-        
-        // Call progress callback
-        if (onProgress) {
-          onProgress(completedUsers, total, debug.error ? debug : undefined);
-        }
-        
-        // İşlem durumunu düzenli olarak kaydet (her 10 kullanıcıda bir)
-        if (completedUsers % 10 === 0) {
-          await saveOperationProgress('follow', handle, completedUsers, total, users);
-        }
-        
-        // Add a longer delay with jitter between each follow (500-800ms)
-        // This helps avoid being flagged as automated/spam behavior
-        if (i < chunk.length - 1) {
-          const delay = 500 + Math.floor(Math.random() * 300);
-          console.log(`Waiting ${delay}ms before next user in chunk`);
-          await new Promise(resolve => setTimeout(resolve, delay));
+          
+          lastProcessedIndex = completedUsers;
+          completedUsers++;
+          
+          // Call progress callback
+          if (onProgress) {
+            onProgress(completedUsers, total, debug.error ? debug : undefined);
+          }
+          
+          // İşlem durumunu düzenli olarak kaydet (her 10 kullanıcıda bir)
+          if (completedUsers % 10 === 0) {
+            await saveOperationProgress('follow', handle, completedUsers, total, users);
+          }
+          
+          // Add a longer delay with jitter between each follow (500-800ms)
+          // This helps avoid being flagged as automated/spam behavior
+          if (i < chunk.length - 1) {
+            const delay = 500 + Math.floor(Math.random() * 300);
+            console.log(`Waiting ${delay}ms before next user in chunk`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        } catch (error) {
+          if (error instanceof Error && (error.name === 'AbortError' || error.message === 'canceled')) {
+            console.log('User operation was aborted');
+            throw error; // Rethrow to abort the whole process
+          }
+          
+          // Handle other errors
+          failedCount++;
+          console.error(`Error following user ${user.handle}:`, error);
+          const errorDebug: DebugInfo = {
+            error: true,
+            message: error instanceof Error ? error.message : 'Unknown error during follow operation',
+            details: { user }
+          };
+          
+          errors.push(errorDebug);
+          
+          // Only keep last 5 errors
+          if (errors.length > 5) {
+            errors.shift();
+          }
+          
+          // Call progress callback
+          if (onProgress) {
+            onProgress(completedUsers, total, errorDebug);
+          }
+          
+          // Continue with next user
+          lastProcessedIndex = completedUsers;
+          completedUsers++;
         }
       }
       
@@ -1155,8 +1212,24 @@ export const batchFollowUsersWithProgress = async (
     }
     
     return result;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in batch follow operation:', error);
+    
+    // Check if the operation was aborted
+    if (error.name === 'AbortError' || error.message === 'canceled') {
+      console.log('Batch follow operation was aborted by the user');
+      
+      // Send abort info to callback
+      if (onProgress) {
+        const abortInfo: DebugInfo = {
+          error: true,
+          message: 'Operation was canceled by the user',
+          details: { aborted: true }
+        };
+        onProgress(startIndex, users.length, abortInfo);
+      }
+    }
+    
     throw error;
   }
 };
