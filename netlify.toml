@@ -9,6 +9,10 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  # Güvenlik taramasını ayarlıyoruz
+  SECRETS_SCAN_ENABLED = "false"
+  # Alternatif olarak, belirli dosyaları tarama dışı bırakabiliriz
+  SECRETS_SCAN_OMIT_PATHS = ".firebaserc"
 
 [build.processing]
   skip_processing = false

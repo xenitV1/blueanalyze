@@ -7,10 +7,14 @@ let db: any = null;
 if (typeof window !== 'undefined') {
   // Sadece tarayıcı ortamında çalıştır
   try {
-    const firebaseConfig = require('./firebaseConfig');
-    db = firebaseConfig.db;
+    // require yerine dynamic import kullanıyoruz (ESM uyumlu)
+    import('./firebaseConfig').then(firebaseConfig => {
+      db = firebaseConfig.db;
+    }).catch(e => {
+      console.error('Firebase config yüklenemedi:', e);
+    });
   } catch (e) {
-    console.error('Firebase config yüklenemedi:', e);
+    console.error('Firebase config yükleme hatası:', e);
   }
 }
 
