@@ -1,6 +1,33 @@
-# Allow all web crawlers to access all content
+# BlueAnalyze - Bluesky Takipçi Analiz Aracı
+# https://blue-analyze.com/
+
+# Tüm botlar için erişim ayarları
 User-agent: *
 Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /*.json$
 
-# Sitemap location
+# Google botları için özel ayarlar
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 2
+
+User-agent: Googlebot-Image
+Allow: /
+
+User-agent: Googlebot-Mobile
+Allow: /
+
+# Bing botları için özel ayarlar
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 2
+
+# Yandex botları için özel ayarlar
+User-agent: Yandex
+Allow: /
+Crawl-delay: 3
+
+# Site haritası konumu
 Sitemap: https://blue-analyze.com/sitemap.xml 

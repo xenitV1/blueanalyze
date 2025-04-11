@@ -63,6 +63,11 @@ function LayoutWithLanguage({ children }: { children: React.ReactNode }) {
         <meta name="keywords" content={seo.keywords} />
         <meta name="language" content={language === 'EN' ? 'English' : 'Turkish'} />
         <meta name="robots" content="index, follow" />
+        <meta name="author" content="BlueAnalyze" />
+        <meta name="revisit-after" content="7 days" />
+        <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+        <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+        <meta http-equiv="content-language" content={language === 'EN' ? 'en' : 'tr'} />
         {/* Open Graph / Facebook */}
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://blue-analyze.com/" />
@@ -85,6 +90,36 @@ function LayoutWithLanguage({ children }: { children: React.ReactNode }) {
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
             gtag('config', 'G-WFQ4TVVZ8N');
+          `
+        }} />
+        {/* Hreflang Etiketleri */}
+        <link rel="alternate" hrefLang="en" href="https://blue-analyze.com/?lang=EN" />
+        <link rel="alternate" hrefLang="tr" href="https://blue-analyze.com/?lang=TR" />
+        <link rel="alternate" hrefLang="x-default" href="https://blue-analyze.com/" />
+        {/* Schema.org yapısal verileri */}
+        <script type="application/ld+json" dangerouslySetInnerHTML={{
+          __html: `
+            {
+              "@context": "https://schema.org",
+              "@type": "WebApplication",
+              "name": "${seo.title}",
+              "description": "${seo.description}",
+              "applicationCategory": "AnalyticsApplication",
+              "operatingSystem": "Web",
+              "url": "https://blue-analyze.com/",
+              "inLanguage": "${language === 'EN' ? 'en-US' : 'tr-TR'}",
+              "keywords": "${seo.keywords}",
+              "offers": {
+                "@type": "Offer",
+                "price": "0",
+                "priceCurrency": "USD"
+              },
+              "author": {
+                "@type": "Organization",
+                "name": "BlueAnalyze",
+                "url": "https://blue-analyze.com/"
+              }
+            }
           `
         }} />
         <Meta />

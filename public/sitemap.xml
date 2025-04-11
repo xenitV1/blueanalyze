@@ -1,15 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml"
+        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
+        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
   <url>
     <loc>https://blue-analyze.com/</loc>
-    <lastmod>2025-04-11</lastmod>
+    <lastmod>2023-11-15</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://blue-analyze.com/?lang=EN"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://blue-analyze.com/?lang=TR"/>
   </url>
   <url>
     <loc>https://blue-analyze.com/trends</loc>
-    <lastmod>2025-04-11</lastmod>
+    <lastmod>2023-11-15</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://blue-analyze.com/trends?lang=EN"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://blue-analyze.com/trends?lang=TR"/>
+  </url>
+  <url>
+    <loc>https://blue-analyze.com/home</loc>
+    <lastmod>2023-11-15</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://blue-analyze.com/home?lang=EN"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://blue-analyze.com/home?lang=TR"/>
   </url>
 </urlset> 
