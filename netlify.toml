@@ -27,10 +27,33 @@
 [build.processing.images]
   compress = true
 
-# Build öncesi Firebase yapılandırma dosyası kontrolü
-# (Bu kısım GitHub Actions tarafından yönetilecek, ancak Netlify üzerinden deploy durumunda yedek olarak)
+# Build öncesi Firebase yapılandırma dosyası kontrolü - Debug çıktıları eklendi
 [build.lifecycle]
-  onPreBuild = 'if [ ! -f "./app/services/firebaseConfig.ts" ]; then echo "Firebase config missing, copying example..."; mkdir -p ./app/services; cp -f ./app/services/firebaseConfig.example.ts ./app/services/firebaseConfig.ts; sed -i "s/YOUR_API_KEY/${FIREBASE_API_KEY}/g" ./app/services/firebaseConfig.ts; sed -i "s/YOUR_AUTH_DOMAIN/${FIREBASE_AUTH_DOMAIN}/g" ./app/services/firebaseConfig.ts; sed -i "s/YOUR_DATABASE_URL/${FIREBASE_DATABASE_URL}/g" ./app/services/firebaseConfig.ts; sed -i "s/YOUR_PROJECT_ID/${FIREBASE_PROJECT_ID}/g" ./app/services/firebaseConfig.ts; sed -i "s/YOUR_STORAGE_BUCKET/${FIREBASE_STORAGE_BUCKET}/g" ./app/services/firebaseConfig.ts; sed -i "s/YOUR_MESSAGING_SENDER_ID/${FIREBASE_MESSAGING_SENDER_ID}/g" ./app/services/firebaseConfig.ts; sed -i "s/YOUR_APP_ID/${FIREBASE_APP_ID}/g" ./app/services/firebaseConfig.ts; sed -i "s/YOUR_MEASUREMENT_ID/${FIREBASE_MEASUREMENT_ID}/g" ./app/services/firebaseConfig.ts; fi'
+  onPreBuild = '''
+  echo "onPreBuild script başlatılıyor..."
+  echo "Çalışma dizini: $(pwd)"
+  echo "Mevcut dosyalar: $(ls -la ./app/services/)"
+  if [ ! -f "./app/services/firebaseConfig.ts" ]; then
+    echo "Firebase config dosyası bulunamadı, örnek dosyayı kopyalayıp düzenliyorum..."
+    mkdir -p ./app/services
+    cp -f ./app/services/firebaseConfig.example.ts ./app/services/firebaseConfig.ts
+    echo "Dosya kopyalandı, ortam değişkenleriyle değiştiriliyor..."
+    sed -i "s|YOUR_API_KEY|${FIREBASE_API_KEY}|g" ./app/services/firebaseConfig.ts
+    sed -i "s|YOUR_AUTH_DOMAIN|${FIREBASE_AUTH_DOMAIN}|g" ./app/services/firebaseConfig.ts
+    sed -i "s|YOUR_DATABASE_URL|${FIREBASE_DATABASE_URL}|g" ./app/services/firebaseConfig.ts
+    sed -i "s|YOUR_PROJECT_ID|${FIREBASE_PROJECT_ID}|g" ./app/services/firebaseConfig.ts
+    sed -i "s|YOUR_STORAGE_BUCKET|${FIREBASE_STORAGE_BUCKET}|g" ./app/services/firebaseConfig.ts
+    sed -i "s|YOUR_MESSAGING_SENDER_ID|${FIREBASE_MESSAGING_SENDER_ID}|g" ./app/services/firebaseConfig.ts
+    sed -i "s|YOUR_APP_ID|${FIREBASE_APP_ID}|g" ./app/services/firebaseConfig.ts
+    sed -i "s|YOUR_MEASUREMENT_ID|${FIREBASE_MEASUREMENT_ID}|g" ./app/services/firebaseConfig.ts
+    echo "Dosya düzenlendi, içeriği kontrol ediliyor:"
+    cat ./app/services/firebaseConfig.ts
+    echo "firebaseConfig.ts dosyası oluşturuldu ve düzenlendi."
+  else
+    echo "Firebase config dosyası zaten mevcut, işlem yapılmadı."
+  fi
+  ls -la ./app/services/
+  '''
 
 [dev]
   command = "npm run dev"
