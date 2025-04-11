@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import type { Country } from '../../services/trendingAPI';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface CountrySelectorProps {
   selectedCountry: string;
@@ -13,10 +14,24 @@ const CountrySelector: React.FC<CountrySelectorProps> = ({
   countries,
   onChange,
 }) => {
+  const { language } = useLanguage();
+
+  // Translation for the region selection text
+  const translations = {
+    EN: {
+      selectRegion: "Select Region"
+    },
+    TR: {
+      selectRegion: "Bölge Seçin"
+    }
+  };
+
+  const t = translations[language];
+
   return (
     <div className="mb-6">
       <h2 className="text-xl font-semibold mb-3 text-gray-800 dark:text-gray-200">
-        Bölge Seçin
+        {t.selectRegion}
       </h2>
       
       <div className="flex flex-wrap gap-2">
