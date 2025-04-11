@@ -1,12 +1,11 @@
 [[redirects]]
   from = "/*"
-  to = "/.netlify/functions/server"
+  to = "/index.html"
   status = 200
 
 [build]
   command = "npm run build"
   publish = "build/client"
-  functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "18"
@@ -28,13 +27,6 @@
 [build.processing.images]
   compress = true
 
-# Plugins
-[[plugins]]
-  package = "@netlify/plugin-functions-core"
-
-[[plugins]]
-  package = "@netlify/plugin-local-install-core"
-
 # Build öncesi Firebase yapılandırma dosyası kontrolü
 # (Bu kısım GitHub Actions tarafından yönetilecek, ancak Netlify üzerinden deploy durumunda yedek olarak)
 [build.lifecycle]
@@ -42,6 +34,3 @@
 
 [dev]
   command = "npm run dev"
-
-[functions]
-  directory = "netlify/functions"
