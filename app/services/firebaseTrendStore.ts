@@ -1,6 +1,19 @@
 // Firebase Trend Store - Merkezi trend verileri için Firebase hizmeti
 import { ref, set, onValue, get, query, orderByChild, limitToLast } from 'firebase/database';
-import { db } from './firebaseConfig';
+// SSR sırasında window kontrolü ile koşullu import yapalım
+let db: any = null;
+
+// SSR için güvenli import
+if (typeof window !== 'undefined') {
+  // Sadece tarayıcı ortamında çalıştır
+  try {
+    const firebaseConfig = require('./firebaseConfig');
+    db = firebaseConfig.db;
+  } catch (e) {
+    console.error('Firebase config yüklenemedi:', e);
+  }
+}
+
 import type { Trend } from './trendingAPI';
 // İçeri aktarılan COUNTRIES'yi kaldırıyorum, kullanırken API'den alacağız
 // import { COUNTRIES } from './trendingAPI';
@@ -56,6 +69,12 @@ export class FirebaseTrendStore {
   // Tag'i artır
   public incrementTag(tag: string, country: string = 'global'): void {
     try {
+      // SSR veya db null ise işlemi atla
+      if (!db || typeof window === 'undefined') {
+        console.warn('Firebase Database mevcut değil, işlem atlanıyor');
+        return;
+      }
+      
       // Etiket verisini temizle
       const cleanTag = sanitizeTagForFirebase(tag);
       
@@ -112,6 +131,12 @@ export class FirebaseTrendStore {
   // Trendleri getir
   public async getTrends(country: string = 'global', limit: number = 20): Promise<Trend[]> {
     try {
+      // SSR veya db null ise boş array dön
+      if (!db || typeof window === 'undefined') {
+        console.warn('Firebase Database mevcut değil, boş trend listesi dönülüyor');
+        return [];
+      }
+      
       // Veritabanı referansını al - orderByChild yerine doğrudan referans kullan
       const trendsRef = ref(db, `trends/${country}`);
       
@@ -178,6 +203,12 @@ export class FirebaseTrendStore {
   // Eski verileri temizle - günlük olarak çalıştırılabilir
   public async cleanupExpiredData(): Promise<void> {
     try {
+      // SSR veya db null ise işlemi atla
+      if (!db || typeof window === 'undefined') {
+        console.warn('Firebase Database mevcut değil, temizlik atlanıyor');
+        return;
+      }
+      
       const now = new Date().getTime();
       
       // Ülke kodlarını kullan (Circular dependency'den kaçınmak için)

@@ -27,6 +27,11 @@
 [build.processing.images]
   compress = true
 
+# Firebase SSR için webpack yapılandırması
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["firebase", "firebase-admin", "firebase/app", "firebase/database"]
+
 # Build öncesi Firebase yapılandırma dosyası kontrolü - Debug çıktıları eklendi
 [build.lifecycle]
   onPreBuild = '''
