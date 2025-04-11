@@ -67,7 +67,6 @@ function LayoutWithLanguage({ children }: { children: React.ReactNode }) {
         <meta name="revisit-after" content="7 days" />
         <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
         <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
-        <meta name="msvalidate.01" content="83467129CF3903F3D23652B0B8249B8" />
         <meta http-equiv="content-language" content={language === 'EN' ? 'en' : 'tr'} />
         {/* Open Graph / Facebook */}
         <meta property="og:type" content="website" />
