@@ -320,10 +320,10 @@ export const authenticateUser = async (handle: string, password: string): Promis
     try {
       console.log(`Authentication attempt ${retryCount + 1}/${MAX_RETRIES + 1} for user: ${handle}`);
       
-      // Normalize handle format if needed (remove @ if present)
-      const normalizedHandle = handle.startsWith('@') ? handle.substring(1) : handle;
+      // Normalize handle format: remove @ if present and any spaces
+      const normalizedHandle = handle.startsWith('@') ? handle.substring(1).trim() : handle.trim();
       
-      // Ensure the handle has .bsky.social if no domain is specified
+      // Ensure the handle has a domain (.bsky.social) if no domain is specified
       const formattedHandle = normalizedHandle.includes('.') 
         ? normalizedHandle 
         : `${normalizedHandle}.bsky.social`;

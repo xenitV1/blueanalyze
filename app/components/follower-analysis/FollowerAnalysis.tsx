@@ -196,10 +196,22 @@ const FollowerAnalysis: React.FC = () => {
       return;
     }
 
+    // Kullanıcı adını temizle ve formatla
+    let formattedUsername = username.trim();
+    if (formattedUsername.startsWith('@')) {
+      formattedUsername = formattedUsername.substring(1);
+    }
+    if (!formattedUsername.includes('.')) {
+      formattedUsername = `${formattedUsername}.bsky.social`;
+    }
+    
+    // Temizlenmiş kullanıcı adını state'e kaydet
+    setUsername(formattedUsername);
+
     // Save the username to IndexedDB
     if (typeof window !== 'undefined') {
       try {
-        await saveLastUsername(username);
+        await saveLastUsername(formattedUsername);
       } catch (error) {
         console.error('Failed to save username to IndexedDB:', error);
       }
@@ -221,19 +233,19 @@ const FollowerAnalysis: React.FC = () => {
       // Authenticate user if password provided
       if (password) {
         try {
-          console.log("Authenticating user:", username);
-          const authResponse = await authenticateUser(username, password);
+          console.log("Authenticating user:", formattedUsername);
+          const authResponse = await authenticateUser(formattedUsername, password);
           console.log("Authentication successful, saving session");
           
           const tokenExpiry = Date.now() + 2 * 60 * 60 * 1000; // 2 hours
           setSessionDebugInfo({
-            username: username,
+            username: formattedUsername,
             tokenExpiry: new Date(tokenExpiry).toLocaleString(),
             timeRemaining: "120 minutes (fresh)",
             didFormat: authResponse.did ? `${authResponse.did.substring(0, 10)}...${authResponse.did.substring(authResponse.did.length - 5)}` : "N/A"
           });
           
-          saveSession(username, authResponse);
+          saveSession(formattedUsername, authResponse);
         } catch (authError) {
           console.error('Authentication error:', authError);
         }
@@ -241,7 +253,7 @@ const FollowerAnalysis: React.FC = () => {
 
       // Use the parallel fetching function with progress callback and caching
       const analysisResult = await analyzeFollowersWithProgress(
-        username,
+        formattedUsername,
         (progress) => {
           setFetchProgress(progress);
         }
@@ -250,7 +262,7 @@ const FollowerAnalysis: React.FC = () => {
       // Check if data was from cache
       if (fetchProgress.analysisProgress === 100 && fetchProgress.followersProgress.fetched > 0) {
         // Data was loaded from cache
-        const cachedData = await getAnalysisResults(username);
+        const cachedData = await getAnalysisResults(formattedUsername);
         if (cachedData) {
           const now = Date.now();
           const age = formatTimeAgo(now - cachedData.timestamp);

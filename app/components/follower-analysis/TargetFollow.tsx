@@ -193,6 +193,18 @@ const TargetFollow: React.FC = () => {
       return;
     }
     
+    // Kullanıcı adını temizle ve formatla
+    let formattedSearchTerm = searchTerm.trim();
+    if (formattedSearchTerm.startsWith('@')) {
+      formattedSearchTerm = formattedSearchTerm.substring(1);
+    }
+    if (!formattedSearchTerm.includes('.')) {
+      formattedSearchTerm = `${formattedSearchTerm}.bsky.social`;
+    }
+    
+    // Temizlenmiş kullanıcı adını state'e kaydet
+    setSearchTerm(formattedSearchTerm);
+    
     setIsSearching(true);
     setError(null);
     setTargetUser(null);
@@ -200,7 +212,7 @@ const TargetFollow: React.FC = () => {
     try {
       await checkActiveSession();
       
-      const results = await searchUsers(searchTerm, 1);
+      const results = await searchUsers(formattedSearchTerm, 1);
       if (results.length > 0) {
         const fullProfile = await fetchFullUserProfile(results[0].handle);
         
