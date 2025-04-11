@@ -5,47 +5,7 @@
 
 [build]
   # Önce Firebase yapılandırma dosyasını oluştur, sonra build yap
-  command = "mkdir -p app/services && echo '// Firebase yapılandırma dosyası
-import { initializeApp } from \"firebase/app\";
-import { getDatabase } from \"firebase/database\";
-import { getAnalytics } from \"firebase/analytics\";
-
-// Firebase yapılandırma detayları
-const firebaseConfig = {
-  apiKey: \"${FIREBASE_API_KEY}\",
-  authDomain: \"${FIREBASE_AUTH_DOMAIN}\",
-  databaseURL: \"${FIREBASE_DATABASE_URL}\",
-  projectId: \"${FIREBASE_PROJECT_ID}\",
-  storageBucket: \"${FIREBASE_STORAGE_BUCKET}\",
-  messagingSenderId: \"${FIREBASE_MESSAGING_SENDER_ID}\",
-  appId: \"${FIREBASE_APP_ID}\",
-  measurementId: \"${FIREBASE_MEASUREMENT_ID}\"
-};
-
-// Firebase uygulamasını başlat
-const app = initializeApp(firebaseConfig);
-
-// Realtime Database referansını al
-export const db = getDatabase(app);
-
-// Analytics\"i sadece tarayıcı ortamında başlat
-let analytics = null;
-if (typeof window !== \"undefined\") {
-  analytics = getAnalytics(app);
-}
-
-// Firebase bağlantısı için yardımcı fonksiyonlar
-export function getFirebaseDatabase() {
-  return db;
-}
-
-// Bu dosyayı import eden Netlify Functions veya diğer servisler için
-export default {
-  app,
-  db,
-  analytics,
-  getFirebaseDatabase,
-};' > app/services/firebaseConfig.ts && ls -la app/services/ && npm run build"
+  command = "mkdir -p app/services && echo \"// Firebase yapılandırma dosyası\nimport { initializeApp } from 'firebase/app';\nimport { getDatabase } from 'firebase/database';\nimport { getAnalytics } from 'firebase/analytics';\n\n// Firebase yapılandırma detayları\nconst firebaseConfig = {\n  apiKey: '${FIREBASE_API_KEY}',\n  authDomain: '${FIREBASE_AUTH_DOMAIN}',\n  databaseURL: '${FIREBASE_DATABASE_URL}',\n  projectId: '${FIREBASE_PROJECT_ID}',\n  storageBucket: '${FIREBASE_STORAGE_BUCKET}',\n  messagingSenderId: '${FIREBASE_MESSAGING_SENDER_ID}',\n  appId: '${FIREBASE_APP_ID}',\n  measurementId: '${FIREBASE_MEASUREMENT_ID}'\n};\n\n// Firebase uygulamasını başlat\nconst app = initializeApp(firebaseConfig);\n\n// Realtime Database referansını al\nexport const db = getDatabase(app);\n\n// Analytics'i sadece tarayıcı ortamında başlat\nlet analytics = null;\nif (typeof window !== 'undefined') {\n  analytics = getAnalytics(app);\n}\n\n// Firebase bağlantısı için yardımcı fonksiyonlar\nexport function getFirebaseDatabase() {\n  return db;\n}\n\n// Bu dosyayı import eden Netlify Functions veya diğer servisler için\nexport default {\n  app,\n  db,\n  analytics,\n  getFirebaseDatabase,\n};\" > app/services/firebaseConfig.ts && ls -la app/services/ && npm run build"
   publish = "build/client"
 
 [build.environment]
