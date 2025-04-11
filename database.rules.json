@@ -1,0 +1,8 @@
+{
+  "rules": {
+    "trends": {
+      ".read": true,
+      ".write": true
+    }
+  }
+} 

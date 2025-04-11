@@ -14,6 +14,10 @@ BlueAnalyze is a comprehensive follower analysis tool developed for Bluesky user
 - **Target-Based Following**: Follow a specific user's followers or following in bulk
 - **Session Management**: Secure login using App Password and token management
 - **Multilingual Support**: English and Turkish language support
+- **Real-Time Tag Trends**: Track popular tag trends in real-time
+- **Country Filtering**: Filter followers and following by country
+- **Centralized Data Collection**: Collect data centrally using Firebase
+- **Automated Data Cleanup**: Automatically clean data using Cloud Functions
 
 ## 📋 Data Schema
 
@@ -146,3 +150,63 @@ For questions or suggestions, you can reach out via [GitHub Issues](https://gith
 ---
 
 🔹 BlueAnalyze is an unofficial tool and not directly affiliated with Bluesky Social.
+
+## 🔥 Firebase Configuration
+
+1. **Repo'yu klonlayın**
+```bash
+git clone https://github.com/YOUR-USERNAME/blueanalyze.git
+cd blueanalyze
+```
+
+2. **Gerekli bağımlılıkları yükleyin**
+```bash
+npm install
+```
+
+3. **Firebase yapılandırması**
+   - `app/services/firebaseConfig.example.ts` dosyasını `app/services/firebaseConfig.ts` olarak kopyalayın
+   - Firebase konsolunuzdan aldığınız gerçek yapılandırma değerlerini girin
+
+```typescript
+// Bu değerleri kendi Firebase projenizin bilgileriyle değiştirin
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.REGION.firebasedatabase.app",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId: "YOUR_APP_ID",
+  measurementId: "YOUR_MEASUREMENT_ID"
+};
+```
+
+4. **Uygulamayı geliştirme modunda başlatın**
+```bash
+npm run dev
+```
+
+## 🔥 Firebase Functions Kurulumu
+
+24 saatte bir verilerin otomatik temizlenmesi için Cloud Functions kurulumu:
+
+1. **Firebase CLI'yi yükleyin** (eğer yüklü değilse)
+```bash
+npm install -g firebase-tools
+```
+
+2. **Firebase hesabınıza giriş yapın**
+```bash
+firebase login
+```
+
+3. **Functions'ı deploy edin**
+```bash
+firebase deploy --only functions
+```
+
+## 🔥 Notlar
+
+- `firebaseConfig.ts` dosyası güvenlik nedeniyle .gitignore'a eklenmiştir. Bu projeyi fork ederken kendi Firebase yapılandırmanızı eklemeyi unutmayın.
+- Veritabanı kuralları test amaçlı olarak açıktır. Canlı ortamda daha sıkı kurallar kullanılmalıdır.

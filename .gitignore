@@ -10,3 +10,14 @@
 
 # SpecStory folder
 .specstory/
+
+# Firebase
+app/services/firebaseConfig.ts
+.env
+.env.local
+.env.development
+.env.production
+firebase-debug.log
+firebase-debug.*.log
+ui-debug.log
+.firebase/
