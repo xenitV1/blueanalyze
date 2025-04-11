@@ -452,4 +452,59 @@ export const clearAnalysisResults = async (username: string): Promise<void> => {
   } catch (error) {
     console.error('Failed to clear analysis results:', error);
   }
+};
+
+/**
+ * Clear all cache data except authentication
+ * This function cleans all data in ANALYSIS_STORE, PROGRESS_STORE, and unnecessary PREFERENCES_STORE items
+ * Authentication data is preserved to keep the user logged in
+ */
+export const clearAllCache = async (): Promise<void> => {
+  try {
+    const db = await initDatabase();
+    
+    // Clear Analysis Store
+    await clearAllStoreItems(db, ANALYSIS_STORE);
+    
+    // Clear Progress Store
+    await clearAllStoreItems(db, PROGRESS_STORE);
+    
+    // Only clear specific preference items if needed (keep language settings)
+    // If you have specific preferences to keep, handle them here
+    
+    console.log('All cache data cleared successfully');
+  } catch (error) {
+    console.error('Failed to clear all cache:', error);
+    throw error;
+  }
+};
+
+/**
+ * Helper function to clear all items in a specific store
+ */
+const clearAllStoreItems = async (db: IDBDatabase, storeName: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    try {
+      const transaction = db.transaction(storeName, 'readwrite');
+      const store = transaction.objectStore(storeName);
+      const request = store.clear();
+      
+      request.onsuccess = () => {
+        console.log(`Cleared all items in ${storeName} store`);
+        resolve();
+      };
+      
+      request.onerror = (event) => {
+        console.error(`Error clearing ${storeName} store:`, (event.target as IDBRequest).error);
+        reject((event.target as IDBRequest).error);
+      };
+      
+      transaction.oncomplete = () => {
+        // Transaction completed successfully
+      };
+    } catch (error) {
+      console.error(`Error in clearAllStoreItems for ${storeName}:`, error);
+      reject(error);
+    }
+  });
 }; 

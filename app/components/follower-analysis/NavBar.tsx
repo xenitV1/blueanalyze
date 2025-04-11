@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { FiGlobe, FiLoader, FiActivity, FiGithub, FiHash } from 'react-icons/fi';
+import { FiGlobe, FiLoader, FiActivity, FiGithub, FiHash, FiTrash } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useOperation } from '../../contexts/OperationContext';
-import type { Language } from '../../contexts/LanguageContext';
+import { clearAllCache } from '../../services/indexedDBService';
 
 const NavBar: React.FC = () => {
   const { language, setLanguage, t } = useLanguage();
   const { operation, togglePause } = useOperation();
+  const [cacheCleared, setCacheCleared] = useState(false);
   
   // Geçerli sayfayı kontrol et
   const isHomePage = window.location.pathname === '/';
@@ -21,6 +22,21 @@ const NavBar: React.FC = () => {
     setLanguage(language === 'EN' ? 'TR' : 'EN');
   };
 
+  // Clear all cache function
+  const handleClearCache = async () => {
+    try {
+      await clearAllCache();
+      setCacheCleared(true);
+      
+      // Reset status after 3 seconds
+      setTimeout(() => {
+        setCacheCleared(false);
+      }, 3000);
+    } catch (error) {
+      console.error('Failed to clear cache:', error);
+    }
+  };
+
   return (
     <motion.nav
       initial={{ opacity: 0, y: -10 }}
@@ -30,28 +46,35 @@ const NavBar: React.FC = () => {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
-          <div className="flex-shrink-0 flex items-center">
+          <div className="flex-shrink-0 flex items-center space-x-4">
             <a
               href="/" 
               className="text-xl font-semibold text-primary hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
             >
               {t.appTitle}
             </a>
+
+            {/* Önbellek temizleme butonu - başlığın yanında */}
+            <button
+              onClick={handleClearCache}
+              className={`px-3 py-1 rounded-full focus:outline-none flex items-center transition-colors ${
+                cacheCleared 
+                  ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300" 
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+              }`}
+              aria-label={t.clearCache}
+              title={t.clearCache}
+            >
+              <FiTrash className="h-4 w-4" />
+              <span className="ml-1 text-xs hidden md:inline-block">
+                {cacheCleared ? t.cacheCleared : t.clearCache}
+              </span>
+            </button>
           </div>
           
           <div className="flex items-center space-x-4">
             {/* Ana sayfa ve Trendler sayfası bağlantıları */}
             <div className="hidden md:flex space-x-2 mr-2">
-              <a
-                href="/"
-                className={`px-3 py-1 rounded-full transition-colors ${
-                  isHomePage
-                    ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
-                    : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-                }`}
-              >
-                Ana Sayfa
-              </a>
               <a
                 href="/trends"
                 className={`px-3 py-1 rounded-full transition-colors flex items-center ${
@@ -61,7 +84,7 @@ const NavBar: React.FC = () => {
                 }`}
               >
                 <FiHash className="h-4 w-4 mr-1" />
-                Trendler
+                {t.trends}
               </a>
             </div>
             

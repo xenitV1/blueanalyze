@@ -11,6 +11,9 @@ export interface Translations {
   darkMode: string;
   lightMode: string;
   changeLanguage: string;
+  clearCache: string;  // Önbelleği Temizle çevirisi
+  cacheCleared: string; // Temizlendi çevirisi
+  trends: string;      // Trendler çevirisi
   
   // Follower Analysis
   appTitle: string;
@@ -90,6 +93,9 @@ const enTranslations: Translations = {
   darkMode: 'Switch to dark mode',
   lightMode: 'Switch to light mode',
   changeLanguage: 'Change language',
+  clearCache: 'Clear Cache',
+  cacheCleared: 'Cleared!',
+  trends: 'Trends',
   
   // Follower Analysis
   appTitle: 'BlueAnalyze - Bluesky Analytics Tool',
@@ -169,6 +175,9 @@ const trTranslations: Translations = {
   darkMode: 'Karanlık moda geç',
   lightMode: 'Aydınlık moda geç',
   changeLanguage: 'Dili değiştir',
+  clearCache: 'Önbelleği Temizle',
+  cacheCleared: 'Temizlendi!',
+  trends: 'Trendler',
   
   // Follower Analysis
   appTitle: 'BlueAnalyze - Bluesky Analiz Aracı',
