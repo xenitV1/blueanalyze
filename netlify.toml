@@ -6,6 +6,39 @@
 [build]
   command = "npm run build"
   publish = "build/client"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+[build.processing]
+  skip_processing = false
+
+[build.processing.css]
+  bundle = true
+  minify = true
+
+[build.processing.js]
+  bundle = true
+  minify = true
+
+[build.processing.html]
+  pretty_urls = true
+
+[build.processing.images]
+  compress = true
+
+# Plugins
+[[plugins]]
+  package = "@netlify/plugin-functions-core"
+
+[[plugins]]
+  package = "@netlify/plugin-local-install-core"
+
+# Build öncesi Firebase yapılandırma dosyası kontrolü
+# (Bu kısım GitHub Actions tarafından yönetilecek, ancak Netlify üzerinden deploy durumunda yedek olarak)
+[build.lifecycle]
+  onPreBuild = 'if [ ! -f "./app/services/firebaseConfig.ts" ]; then echo "Firebase config missing, copying example..."; mkdir -p ./app/services; cp -f ./app/services/firebaseConfig.example.ts ./app/services/firebaseConfig.ts; fi'
 
 [dev]
   command = "npm run dev"
