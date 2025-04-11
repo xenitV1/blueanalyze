@@ -153,23 +153,23 @@ For questions or suggestions, you can reach out via [GitHub Issues](https://gith
 
 ## 🔥 Firebase Configuration
 
-1. **Repo'yu klonlayın**
+1. **Clone the repository**
 ```bash
 git clone https://github.com/YOUR-USERNAME/blueanalyze.git
 cd blueanalyze
 ```
 
-2. **Gerekli bağımlılıkları yükleyin**
+2. **Install required dependencies**
 ```bash
 npm install
 ```
 
-3. **Firebase yapılandırması**
-   - `app/services/firebaseConfig.example.ts` dosyasını `app/services/firebaseConfig.ts` olarak kopyalayın
-   - Firebase konsolunuzdan aldığınız gerçek yapılandırma değerlerini girin
+3. **Firebase configuration**
+   - Copy the `app/services/firebaseConfig.example.ts` file to `app/services/firebaseConfig.ts`
+   - Enter the actual configuration values from your Firebase console
 
 ```typescript
-// Bu değerleri kendi Firebase projenizin bilgileriyle değiştirin
+// Replace these values with your Firebase project information
 const firebaseConfig = {
   apiKey: "YOUR_API_KEY",
   authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
@@ -182,31 +182,33 @@ const firebaseConfig = {
 };
 ```
 
-4. **Uygulamayı geliştirme modunda başlatın**
+4. **Start the application in development mode**
 ```bash
 npm run dev
 ```
 
-## 🔥 Firebase Functions Kurulumu
+## 🔥 Firebase Functions Setup
 
-24 saatte bir verilerin otomatik temizlenmesi için Cloud Functions kurulumu:
+Setup Cloud Functions for automatic data cleaning every 24 hours:
 
-1. **Firebase CLI'yi yükleyin** (eğer yüklü değilse)
+1. **Install Firebase CLI** (if not already installed)
 ```bash
 npm install -g firebase-tools
 ```
 
-2. **Firebase hesabınıza giriş yapın**
+2. **Log in to your Firebase account**
 ```bash
 firebase login
 ```
 
-3. **Functions'ı deploy edin**
+3. **Deploy Functions**
 ```bash
 firebase deploy --only functions
 ```
 
-## 🔥 Notlar
+## 🔥 Notes
 
-- `firebaseConfig.ts` dosyası güvenlik nedeniyle .gitignore'a eklenmiştir. Bu projeyi fork ederken kendi Firebase yapılandırmanızı eklemeyi unutmayın.
-- Veritabanı kuralları test amaçlı olarak açıktır. Canlı ortamda daha sıkı kurallar kullanılmalıdır.
+- The `firebaseConfig.ts` file is added to .gitignore for security reasons. Remember to add your own Firebase configuration when forking this project.
+- Database rules are open for testing purposes. Stricter rules should be used in a production environment.
+
+Built with Cursor. Thanks to the Cursor team
