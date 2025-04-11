@@ -9,7 +9,7 @@ import {
 
 import type { Route } from "./+types/root";
 import "./app.css";
-import { LanguageProvider } from './contexts/LanguageContext';
+import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 import { OperationProvider } from './contexts/OperationContext';
 
 export const links: Route.LinksFunction = () => [
@@ -28,29 +28,54 @@ export const links: Route.LinksFunction = () => [
   { rel: "apple-touch-icon", href: "/blueanalyze.png" },
 ];
 
-export function Layout({ children }: { children: React.ReactNode }) {
+// SEO content for each language
+const seoContent = {
+  EN: {
+    title: "BlueAnalyze - Bluesky Follower Analytics Tool",
+    description: "Analyze your Bluesky followers and following relationships. Track mutual connections, find non-followers and manage your Bluesky social network with BlueAnalyze.",
+    keywords: "bluesky, bluesky analytics, follower analysis, social media, blue analyze, bluesky followers, mutual connections",
+    ogDescription: "Analyze your Bluesky followers and following relationships. Track mutual connections, find non-followers and manage your Bluesky social network.",
+    locale: "en_US",
+  },
+  TR: {
+    title: "BlueAnalyze - Bluesky Takipçi Analiz Aracı",
+    description: "Bluesky takipçilerinizi ve takip ilişkilerinizi analiz edin. Karşılıklı takipleşenlerinizi takip edin, takip etmeyenleri bulun ve Bluesky sosyal ağınızı BlueAnalyze ile yönetin.",
+    keywords: "bluesky, bluesky analiz, takipçi analizi, sosyal medya, blue analyze, bluesky takipçileri, karşılıklı takipleşenler",
+    ogDescription: "Bluesky takipçilerinizi ve takip ilişkilerinizi analiz edin. Karşılıklı takipleşenlerinizi takip edin, takip etmeyenleri bulun ve Bluesky sosyal ağınızı yönetin.",
+    locale: "tr_TR",
+  }
+};
+
+function LayoutWithLanguage({ children }: { children: React.ReactNode }) {
+  const { language } = useLanguage();
+  const seo = seoContent[language];
+
   return (
-    <html lang="en" className="h-full">
+    <html lang={language === 'EN' ? 'en' : 'tr'} className="h-full">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f3f4f6" />
         <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1f2937" />
         {/* SEO Meta Tags */}
-        <title>BlueAnalyze - Bluesky Follower Analytics Tool</title>
-        <meta name="description" content="Analyze your Bluesky followers and following relationships. Track mutual followers, find non-followers and manage your Bluesky social network with BlueAnalyze." />
-        <meta name="keywords" content="bluesky, bluesky analytics, follower analysis, social media, blue analyze, bluesky followers" />
+        <title>{seo.title}</title>
+        <meta name="description" content={seo.description} />
+        <meta name="keywords" content={seo.keywords} />
+        <meta name="language" content={language === 'EN' ? 'English' : 'Turkish'} />
+        <meta name="robots" content="index, follow" />
         {/* Open Graph / Facebook */}
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://blue-analyze.com/" />
-        <meta property="og:title" content="BlueAnalyze - Bluesky Follower Analytics Tool" />
-        <meta property="og:description" content="Analyze your Bluesky followers and following relationships. Track mutual followers, find non-followers and manage your Bluesky social network." />
+        <meta property="og:title" content={seo.title} />
+        <meta property="og:description" content={seo.ogDescription} />
         <meta property="og:image" content="https://blue-analyze.com/blueanalyze.png" />
+        <meta property="og:locale" content={seo.locale} />
+        <meta property="og:site_name" content="BlueAnalyze" />
         {/* Twitter */}
         <meta property="twitter:card" content="summary_large_image" />
         <meta property="twitter:url" content="https://blue-analyze.com/" />
-        <meta property="twitter:title" content="BlueAnalyze - Bluesky Follower Analytics Tool" />
-        <meta property="twitter:description" content="Analyze your Bluesky followers and following relationships. Track mutual followers, find non-followers and manage your Bluesky social network." />
+        <meta property="twitter:title" content={seo.title} />
+        <meta property="twitter:description" content={seo.ogDescription} />
         <meta property="twitter:image" content="https://blue-analyze.com/blueanalyze.png" />
         {/* Google Analytics */}
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-WFQ4TVVZ8N"></script>
@@ -74,6 +99,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
+export function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <LanguageProvider>
+      <LayoutWithLanguage>{children}</LayoutWithLanguage>
+    </LanguageProvider>
+  );
+}
+
 export default function App() {
   return (
     <LanguageProvider>
@@ -85,15 +118,39 @@ export default function App() {
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
-  let message = "Oops!";
-  let details = "An unexpected error occurred.";
+  const errorMessages = {
+    EN: {
+      default: "Oops!",
+      details: "An unexpected error occurred.",
+      notFound: "The requested page could not be found."
+    },
+    TR: {
+      default: "Hata!",
+      details: "Beklenmedik bir hata oluştu.",
+      notFound: "İstenen sayfa bulunamadı."
+    }
+  };
+
+  // Try to use language context, fall back to English if not available
+  let language: 'EN' | 'TR' = 'EN';
+  try {
+    const { language: contextLanguage } = useLanguage();
+    language = contextLanguage;
+  } catch (e) {
+    // If context is not available, default to EN
+  }
+  
+  const messages = errorMessages[language];
+  
+  let message = messages.default;
+  let details = messages.details;
   let stack: string | undefined;
 
   if (isRouteErrorResponse(error)) {
-    message = error.status === 404 ? "404" : "Error";
+    message = error.status === 404 ? "404" : messages.default;
     details =
       error.status === 404
-        ? "The requested page could not be found."
+        ? messages.notFound
         : error.statusText || details;
   } else if (import.meta.env.DEV && error && error instanceof Error) {
     details = error.message;
@@ -101,14 +158,16 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   }
 
   return (
-    <main className="pt-16 p-4 container mx-auto">
-      <h1>{message}</h1>
-      <p>{details}</p>
-      {stack && (
-        <pre className="w-full p-4 overflow-x-auto">
-          <code>{stack}</code>
-        </pre>
-      )}
-    </main>
+    <LanguageProvider>
+      <main className="pt-16 p-4 container mx-auto">
+        <h1>{message}</h1>
+        <p>{details}</p>
+        {stack && (
+          <pre className="w-full p-4 overflow-x-auto">
+            <code>{stack}</code>
+          </pre>
+        )}
+      </main>
+    </LanguageProvider>
   );
 }
