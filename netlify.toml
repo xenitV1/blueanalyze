@@ -36,32 +36,55 @@
   node_bundler = "esbuild"
   external_node_modules = ["firebase", "firebase-admin", "firebase/app", "firebase/database"]
 
-# Build öncesi Firebase yapılandırma dosyası kontrolü - Debug çıktıları eklendi
+# Build öncesi Firebase yapılandırma dosyasını oluştur (GitHub Actions'takine benzer şekilde)
 [build.lifecycle]
   onPreBuild = '''
-  echo "onPreBuild script başlatılıyor..."
-  echo "Çalışma dizini: $(pwd)"
-  echo "Mevcut dosyalar: $(ls -la ./app/services/)"
-  if [ ! -f "./app/services/firebaseConfig.ts" ]; then
-    echo "Firebase config dosyası bulunamadı, örnek dosyayı kopyalayıp düzenliyorum..."
-    mkdir -p ./app/services
-    cp -f ./app/services/firebaseConfig.example.ts ./app/services/firebaseConfig.ts
-    echo "Dosya kopyalandı, ortam değişkenleriyle değiştiriliyor..."
-    sed -i "s|YOUR_API_KEY|${FIREBASE_API_KEY}|g" ./app/services/firebaseConfig.ts
-    sed -i "s|YOUR_AUTH_DOMAIN|${FIREBASE_AUTH_DOMAIN}|g" ./app/services/firebaseConfig.ts
-    sed -i "s|YOUR_DATABASE_URL|${FIREBASE_DATABASE_URL}|g" ./app/services/firebaseConfig.ts
-    sed -i "s|YOUR_PROJECT_ID|${FIREBASE_PROJECT_ID}|g" ./app/services/firebaseConfig.ts
-    sed -i "s|YOUR_STORAGE_BUCKET|${FIREBASE_STORAGE_BUCKET}|g" ./app/services/firebaseConfig.ts
-    sed -i "s|YOUR_MESSAGING_SENDER_ID|${FIREBASE_MESSAGING_SENDER_ID}|g" ./app/services/firebaseConfig.ts
-    sed -i "s|YOUR_APP_ID|${FIREBASE_APP_ID}|g" ./app/services/firebaseConfig.ts
-    sed -i "s|YOUR_MEASUREMENT_ID|${FIREBASE_MEASUREMENT_ID}|g" ./app/services/firebaseConfig.ts
-    echo "Dosya düzenlendi, içeriği kontrol ediliyor:"
-    cat ./app/services/firebaseConfig.ts
-    echo "firebaseConfig.ts dosyası oluşturuldu ve düzenlendi."
-  else
-    echo "Firebase config dosyası zaten mevcut, işlem yapılmadı."
-  fi
-  ls -la ./app/services/
+  echo "Firebase yapılandırma dosyası oluşturuluyor..."
+  mkdir -p app/services
+  cat > app/services/firebaseConfig.ts << EOL
+  // Firebase yapılandırma dosyası
+  import { initializeApp } from 'firebase/app';
+  import { getDatabase } from 'firebase/database';
+  import { getAnalytics } from 'firebase/analytics';
+
+  // Firebase yapılandırma detayları
+  const firebaseConfig = {
+    apiKey: "${FIREBASE_API_KEY}",
+    authDomain: "${FIREBASE_AUTH_DOMAIN}",
+    databaseURL: "${FIREBASE_DATABASE_URL}",
+    projectId: "${FIREBASE_PROJECT_ID}",
+    storageBucket: "${FIREBASE_STORAGE_BUCKET}",
+    messagingSenderId: "${FIREBASE_MESSAGING_SENDER_ID}",
+    appId: "${FIREBASE_APP_ID}",
+    measurementId: "${FIREBASE_MEASUREMENT_ID}"
+  };
+
+  // Firebase uygulamasını başlat
+  const app = initializeApp(firebaseConfig);
+
+  // Realtime Database referansını al
+  export const db = getDatabase(app);
+
+  // Analytics'i sadece tarayıcı ortamında başlat
+  let analytics = null;
+  if (typeof window !== 'undefined') {
+    analytics = getAnalytics(app);
+  }
+
+  // Firebase bağlantısı için yardımcı fonksiyonlar
+  export function getFirebaseDatabase() {
+    return db;
+  }
+
+  // Bu dosyayı import eden Netlify Functions veya diğer servisler için
+  export default {
+    app,
+    db,
+    analytics,
+    getFirebaseDatabase,
+  };
+  EOL
+  echo "Firebase yapılandırma dosyası oluşturuldu."
   '''
 
 [dev]
