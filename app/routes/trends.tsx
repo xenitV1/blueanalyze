@@ -38,9 +38,30 @@ const translations = {
   }
 };
 
-export function meta({}: Route.MetaArgs) {
-  // The meta function doesn't have access to hooks, so we'll have language-specific meta in the component
-  return [];
+export function meta({ location }: Route.MetaArgs) {
+  // Determine language from URL search param
+  const urlParams = new URLSearchParams(location.search);
+  const lang = urlParams.get('lang') === 'TR' ? 'TR' : 'EN';
+  
+  // Use the appropriate translation based on detected language
+  const t = translations[lang];
+  
+  return [
+    { title: t.pageTitle },
+    { name: "description", content: t.pageDescription },
+    { name: "keywords", content: t.pageKeywords },
+    { property: "og:type", content: "website" },
+    { property: "og:url", content: "https://blue-analyze.com/trends" },
+    { property: "og:title", content: t.pageTitle },
+    { property: "og:description", content: t.pageDescription },
+    { property: "og:image", content: "https://blue-analyze.com/blueanalyze.png" },
+    { property: "twitter:card", content: "summary_large_image" },
+    { property: "twitter:url", content: "https://blue-analyze.com/trends" },
+    { property: "twitter:title", content: t.pageTitle },
+    { property: "twitter:description", content: t.pageDescription },
+    { property: "twitter:image", content: "https://blue-analyze.com/blueanalyze.png" },
+    { tagName: "link", rel: "canonical", href: "https://blue-analyze.com/trends" }
+  ];
 }
 
 export default function TrendsPage() {
@@ -112,27 +133,6 @@ export default function TrendsPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <NavBar />
-      
-      {/* Language-specific meta tags */}
-      <head>
-        <title>{t.pageTitle}</title>
-        <meta name="description" content={t.pageDescription} />
-        <meta name="keywords" content={t.pageKeywords} />
-        {/* Open Graph / Facebook */}
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://blue-analyze.com/trends" />
-        <meta property="og:title" content={t.pageTitle} />
-        <meta property="og:description" content={t.pageDescription} />
-        <meta property="og:image" content="https://blue-analyze.com/blueanalyze.png" />
-        {/* Twitter */}
-        <meta property="twitter:card" content="summary_large_image" />
-        <meta property="twitter:url" content="https://blue-analyze.com/trends" />
-        <meta property="twitter:title" content={t.pageTitle} />
-        <meta property="twitter:description" content={t.pageDescription} />
-        <meta property="twitter:image" content="https://blue-analyze.com/blueanalyze.png" />
-        {/* Canonical URL */}
-        <link rel="canonical" href="https://blue-analyze.com/trends" />
-      </head>
       
       <main className="py-8">
         <motion.div
