@@ -305,35 +305,60 @@ class JetstreamClient {
   private status: ConnectionStatus = 'disconnected';
   private reconnectTimer: NodeJS.Timeout | null = null;
   private reconnectAttempts: number = 0;
-  private maxReconnectAttempts: number = 5;
-  private reconnectDelay: number = 2000; // 2 saniye
+  private maxReconnectAttempts: number = 15; // Daha fazla deneme
+  private reconnectDelay: number = 1500; // Daha kısa sürede denesin
+  private heartbeatInterval: NodeJS.Timeout | null = null;
+  private lastMessageTime: number = 0;
+  private messageTimeout: number = 60000; // 60 saniye
   
   constructor() {
     // Bağlantıyı başlat
     this.connect();
+    
+    // Düzenli olarak bağlantı durumunu kontrol et
+    this.setupHeartbeat();
   }
   
   // WebSocket bağlantısını başlat
   connect() {
-    if (this.status === 'connecting' || this.status === 'connected') {
+    if (this.status === 'connecting') {
       return;
+    }
+    
+    if (this.ws) {
+      try {
+        this.ws.close();
+      } catch (e) {
+        // Hata olursa yok say
+      }
+      this.ws = null;
     }
     
     this.status = 'connecting';
     
     try {
-      // Jetstream WebSocket'e bağlan - sadece 'app.bsky.feed.post' koleksiyonunu dinle
-      const url = 'wss://jetstream1.us-east.bsky.network/subscribe?wantedCollections=app.bsky.feed.post';
+      // Alternatif endpoint'ler
+      const endpoints = [
+        'wss://jetstream1.us-east.bsky.network/subscribe?wantedCollections=app.bsky.feed.post',
+        'wss://jetstream2.us-east.bsky.network/subscribe?wantedCollections=app.bsky.feed.post',
+        'wss://jetstream-test.bsky.app/subscribe?wantedCollections=app.bsky.feed.post'
+      ];
+      
+      // Endpoint'in birini seç - reconnect ise farklı endpoint dene
+      const url = endpoints[this.reconnectAttempts % endpoints.length];
       
       this.ws = new WebSocket(url);
       
       this.ws.onopen = () => {
-        console.log('Connected to Bluesky Jetstream');
         this.status = 'connected';
         this.reconnectAttempts = 0;
+        this.lastMessageTime = Date.now();
       };
       
       this.ws.onmessage = async (event) => {
+        // Mesaj alındı, son mesaj zamanını güncelle
+        this.lastMessageTime = Date.now();
+        
         try {
           // Gelen JSON mesajını işle
           const data = JSON.parse(event.data);
@@ -376,25 +401,8 @@ class JetstreamClient {
                 
                 // Facets'ten hashtag'ler bulunduysa işle
                 if (hashtagFacets.length > 0) {
-                  for (const tag of hashtagFacets) {
-                    const normalizedTag = tag.toLowerCase();
-                    
-                    if (USE_FIREBASE && firebaseTrendStore) {
-                      // Firebase için
-                      await firebaseTrendStore.incrementTag(normalizedTag, 'global'); // Global için
-                      if (countryCode !== 'global') {
-                        await firebaseTrendStore.incrementTag(normalizedTag, countryCode); // Ülke için
-                      }
-                    } else {
-                      // Yerel depolama için
-                      trendStore.incrementTag(normalizedTag, 'global'); // Global için
-                      if (countryCode !== 'global') {
-                        trendStore.incrementTag(normalizedTag, countryCode); // Ülke için
-                      }
-                    }
-                  }
-                  
-                  // İşlem tamamlandı, geri dön
+                  // Hashtag'leri işleme fonksiyonunu çağır
+                  this.processHashtags(hashtagFacets, postLangs);
                   return;
                 }
               }
@@ -402,23 +410,9 @@ class JetstreamClient {
               // Eğer facets içinde hashtag bulunamadıysa, metin içinden çıkar
               const hashtags = this.extractHashtags(postText);
               
-              // Her hashtag için trend verisini güncelle
+              // Hashtag'leri işleme fonksiyonunu çağır
               if (hashtags.length > 0) {
-                for (const tag of hashtags) {
-                  if (USE_FIREBASE && firebaseTrendStore) {
-                    // Firebase için
-                    await firebaseTrendStore.incrementTag(tag, 'global'); // Global için
-                    if (countryCode !== 'global') {
-                      await firebaseTrendStore.incrementTag(tag, countryCode); // Ülke için
-                    }
-                  } else {
-                    // Yerel depolama için
-                    trendStore.incrementTag(tag, 'global'); // Global için
-                    if (countryCode !== 'global') {
-                      trendStore.incrementTag(tag, countryCode); // Ülke için
-                    }
-                  }
-                }
+                this.processHashtags(hashtags, postLangs);
               }
             }
           }
@@ -427,23 +421,48 @@ class JetstreamClient {
         }
       };
       
-      this.ws.onclose = () => {
-        console.log('Disconnected from Bluesky Jetstream');
+      this.ws.onclose = (event) => {
         this.status = 'disconnected';
         this.attemptReconnect();
       };
       
       this.ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
         this.status = 'error';
+        console.error('WebSocket hatası:', error);
         this.attemptReconnect();
       };
       
     } catch (error) {
-      console.error('Failed to connect to WebSocket:', error);
       this.status = 'error';
+      console.error('WebSocket bağlantısı kurulamadı:', error);
       this.attemptReconnect();
     }
+  }
+  
+  // Düzenli kalp atışı kontrolü
+  private setupHeartbeat() {
+    // Önceki interval'ı temizle
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+    }
+    
+    // Her 15 saniyede bir bağlantı durumunu kontrol et
+    this.heartbeatInterval = setInterval(() => {
+      const now = Date.now();
+      
+      // Bağlantı kesilmiş veya hata durumundaysa yeniden bağlan
+      if (this.status !== 'connected' && this.status !== 'connecting') {
+        this.connect();
+        return;
+      }
+      
+      // Uzun süredir mesaj alınmadıysa bağlantının kopmuş olabileceğini düşün
+      if (this.lastMessageTime && (now - this.lastMessageTime > this.messageTimeout)) {
+        this.status = 'disconnected';
+        this.connect();
+      }
+      
+    }, 15000); // 15 saniyede bir kontrol et
   }
   
   // Bağlantıyı yeniden kurma girişimi
@@ -454,15 +473,19 @@ class JetstreamClient {
     
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
-      const delay = this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts - 1);
-      
-      console.log(`Attempting to reconnect in ${delay / 1000} seconds (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+      const delay = this.reconnectDelay * Math.min(1.5, Math.pow(1.2, this.reconnectAttempts - 1)); // Daha nazik artış
       
       this.reconnectTimer = setTimeout(() => {
         this.connect();
       }, delay);
     } else {
-      console.error('Max reconnect attempts reached. Please retry manually.');
+      console.error('Maksimum yeniden bağlantı denemesi aşıldı. 30 saniye sonra sıfırdan başlanacak.');
+      this.reconnectAttempts = 0;
+      
+      // 30 saniye bekle ve sıfırdan başla
+      this.reconnectTimer = setTimeout(() => {
+        this.connect();
+      }, 30000);
     }
   }
   
@@ -544,6 +567,55 @@ class JetstreamClient {
     return 'global';
   }
   
+  // Hashtag'leri işleme metodu
+  private processHashtags(hashtags: string[], langs: string[] = []): void {
+    // Hashtag'ler boşsa işlem yapma
+    if (!hashtags || hashtags.length === 0) {
+      return;
+    }
+    
+    // Dil bilgisinden ülke kodunu belirle
+    const countryCode = this.getCountryCodeFromLangs(langs);
+    
+    // USE_FIREBASE true ise Firebase'e kaydet
+    if (USE_FIREBASE && firebaseTrendStore) {
+      // Her hashtag için
+      hashtags.forEach(hashtag => {
+        try {
+          // Hashtag'i küçük harfe çevir ve işle
+          const cleanedHashtag = hashtag.toLowerCase().trim();
+          
+          if (cleanedHashtag.length < 1 || cleanedHashtag.length > 50) {
+            return; // Çok kısa veya çok uzun hashtag'leri atla
+          }
+          
+          // Firebase trend deposuna kaydet
+          firebaseTrendStore.incrementTag(cleanedHashtag, countryCode);
+          
+          // Global olarak da artır (eğer ülke kodu zaten global değilse)
+          if (countryCode !== 'global') {
+            firebaseTrendStore.incrementTag(cleanedHashtag, 'global');
+          }
+        } catch (error) {
+          console.error(`Hashtag işlenirken hata: ${hashtag}`, error);
+        }
+      });
+    } else {
+      // USE_FIREBASE false ise yereldeki trend deposuna kaydet
+      hashtags.forEach(hashtag => {
+        try {
+          const cleanedHashtag = hashtag.toLowerCase().trim();
+          
+          if (cleanedHashtag.length > 0) {
+            trendStore.incrementTag(cleanedHashtag, countryCode);
+          }
+        } catch (error) {
+          console.error(`Hashtag işlenirken hata: ${hashtag}`, error);
+        }
+      });
+    }
+  }
+  
   // Bağlantı durumunu getir
   getStatus(): ConnectionStatus {
     return this.status;
@@ -557,7 +629,11 @@ let jetstreamClient: JetstreamClient | null = null;
 export function initializeJetstreamClient() {
   if (!jetstreamClient) {
     jetstreamClient = new JetstreamClient();
+  } else if (jetstreamClient.getStatus() !== 'connected') {
+    // Bağlantı yoksa yeniden kurulmasını sağla
+    jetstreamClient.connect();
   }
+  
   return jetstreamClient;
 }
 
