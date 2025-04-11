@@ -23,6 +23,8 @@ export default function Home() {
           transition={{ duration: 0.5 }}
           className="container mx-auto px-4"
         >
+          <h1 className="sr-only">BlueAnalyze - Bluesky Follower Analytics Tool</h1>
+          
           <FollowerAnalysis />
         </motion.div>
       </main>
