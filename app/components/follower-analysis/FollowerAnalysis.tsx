@@ -1548,9 +1548,9 @@ const FollowerAnalysis: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <h1 className="text-3xl font-bold text-center mb-8 text-gray-900 dark:text-white">
+            <h2 className="text-3xl font-bold text-center mb-8 text-gray-900 dark:text-white">
               {t.appTitle}
-            </h1>
+            </h2>
             
             {isParallelFetching && renderProgressDisplay()}
             

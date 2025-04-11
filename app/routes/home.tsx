@@ -8,7 +8,6 @@ import type { Route } from "./+types/home";
 export function meta({}: Route.MetaArgs) {
   return [
     { title: "Bluesky Follower Analysis" },
-    { name: "description", content: "Analyze your Bluesky followers and following" },
   ];
 }
 

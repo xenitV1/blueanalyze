@@ -48,18 +48,10 @@ export function meta({ location }: Route.MetaArgs) {
   
   return [
     { title: t.pageTitle },
-    { name: "description", content: t.pageDescription },
-    { name: "keywords", content: t.pageKeywords },
-    { property: "og:type", content: "website" },
     { property: "og:url", content: "https://blue-analyze.com/trends" },
     { property: "og:title", content: t.pageTitle },
-    { property: "og:description", content: t.pageDescription },
-    { property: "og:image", content: "https://blue-analyze.com/blueanalyze.png" },
-    { property: "twitter:card", content: "summary_large_image" },
     { property: "twitter:url", content: "https://blue-analyze.com/trends" },
     { property: "twitter:title", content: t.pageTitle },
-    { property: "twitter:description", content: t.pageDescription },
-    { property: "twitter:image", content: "https://blue-analyze.com/blueanalyze.png" },
     { tagName: "link", rel: "canonical", href: "https://blue-analyze.com/trends" }
   ];
 }
