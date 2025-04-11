@@ -7,6 +7,7 @@ import Card from '../ui/Card';
 import { FiAlertTriangle, FiCheck, FiInfo, FiTrash, FiUserMinus, FiUsers, FiX, FiSearch, FiPlus, FiChevronLeft, FiChevronRight, FiShield, FiUser } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import { useLanguage } from '../../contexts/LanguageContext';
+import * as idb from '../../services/indexedDBService';
 
 const UnfollowAll: React.FC = () => {
   const { t, language } = useLanguage();
@@ -27,6 +28,7 @@ const UnfollowAll: React.FC = () => {
   const [hasActiveSession, setHasActiveSession] = useState(false);
   const [sessionHandle, setSessionHandle] = useState('');
   const [showStorageWarning, setShowStorageWarning] = useState(false);
+  const [cacheInfo, setCacheInfo] = useState<{ timestamp: number, age: string } | null>(null);
   
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -51,6 +53,25 @@ const UnfollowAll: React.FC = () => {
           if (sessionInfo && sessionInfo.username) {
             setSessionHandle(sessionInfo.username);
             setUsername(sessionInfo.username);
+            
+            // Check if there's cached analysis data
+            const cachedData = await idb.getAnalysisResults(sessionInfo.username);
+            if (cachedData && cachedData.result) {
+              // Calculate how old the cache is
+              const ageMs = Date.now() - cachedData.timestamp;
+              const ageMinutes = Math.round(ageMs / (60 * 1000));
+              const ageHours = Math.round(ageMs / (60 * 60 * 1000) * 10) / 10;
+              
+              let ageStr = '';
+              if (ageMinutes < 60) {
+                ageStr = `${ageMinutes} dakika`;
+              } else {
+                ageStr = `${ageHours} saat`;
+              }
+              
+              setCacheInfo({ timestamp: cachedData.timestamp, age: ageStr });
+              console.log(`Using cached data from ${ageStr} ago`);
+            }
             
             // Load following users with the handle
             loadFollowingUsers(sessionInfo.username);
@@ -77,13 +98,37 @@ const UnfollowAll: React.FC = () => {
     setFollowingUsers([]);
 
     try {
-      // Always get fresh data from API for following list
-      const followingUsers = await getAllFollowing(handle);
-      setFollowingUsers(followingUsers);
-      console.log(`Loaded ${followingUsers.length} following users`);
+      // First try to get analysis data from cache
+      const cachedData = await idb.getAnalysisResults(handle);
       
-      if (followingUsers.length === 0) {
-        setError(language === 'TR' ? 'Takip ettiğiniz hesap bulunamadı' : 'No following users found');
+      if (cachedData && cachedData.result) {
+        console.log(`Using cached analysis data for ${handle} from ${new Date(cachedData.timestamp).toLocaleString()}`);
+        
+        // If we have the cached analysis data, use the following users from there
+        const cachedAnalysis = cachedData.result;
+        
+        // Combine all users from analysis (mutuals and notFollowingBack)
+        const allFollowingUsers = [
+          ...cachedAnalysis.notFollowingBack,
+          ...cachedAnalysis.mutuals
+        ];
+        
+        setFollowingUsers(allFollowingUsers);
+        console.log(`Loaded ${allFollowingUsers.length} following users from cache`);
+        
+        if (allFollowingUsers.length === 0) {
+          setError(language === 'TR' ? 'Takip ettiğiniz hesap bulunamadı' : 'No following users found');
+        }
+      } else {
+        // If no cached data, fetch from API
+        console.log(`No cached data found for ${handle}, fetching from API...`);
+        const followingUsers = await getAllFollowing(handle);
+        setFollowingUsers(followingUsers);
+        console.log(`Loaded ${followingUsers.length} following users from API`);
+        
+        if (followingUsers.length === 0) {
+          setError(language === 'TR' ? 'Takip ettiğiniz hesap bulunamadı' : 'No following users found');
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load following users');
@@ -161,8 +206,10 @@ const UnfollowAll: React.FC = () => {
     const validSession = await validateSession();
     
     // If no active session and no password, show error
-    if (!validSession && !password) {
-      setUnfollowError(language === 'TR' ? 'Şifre gerekli' : 'Password required');
+    if (!validSession) {
+      setUnfollowError(language === 'TR' 
+        ? 'Aktif bir oturum bulunamadı. Lütfen Ana sayfadan giriş yapın veya sayfayı yenileyin.' 
+        : 'No active session found. Please login from the main page or refresh the page.');
       return;
     }
 
@@ -210,9 +257,13 @@ const UnfollowAll: React.FC = () => {
       // Add listener for storage errors
       window.addEventListener('error', handleStorageError);
       
+      // Eğer geçerli bir oturum varsa, şifreye gerek olmadan işlemi gerçekleştir
+      // Yoksa, kullanıcının girdiği şifreyi kullan
+      const passwordToUse = validSession ? null : password;
+      
       const unfollowResult = await batchUnfollowUsersWithProgress(
         username,
-        password,
+        passwordToUse,
         usersToUnfollow,
         0,
         (completed, total, lastError) => {
@@ -377,6 +428,19 @@ const UnfollowAll: React.FC = () => {
     );
   };
 
+  // Format timestamp to readable time
+  const formatTimeAgo = (timestamp: number): string => {
+    const ageMs = Date.now() - timestamp;
+    const ageMinutes = Math.round(ageMs / (60 * 1000));
+    
+    if (ageMinutes < 60) {
+      return language === 'TR' ? `${ageMinutes} dakika önce` : `${ageMinutes} minutes ago`;
+    } else {
+      const ageHours = Math.round(ageMs / (60 * 60 * 1000) * 10) / 10;
+      return language === 'TR' ? `${ageHours} saat önce` : `${ageHours} hours ago`;
+    }
+  };
+
   return (
     <div className="w-full max-w-4xl mx-auto">
       <Card className="mb-8">
@@ -396,28 +460,8 @@ const UnfollowAll: React.FC = () => {
           </p>
         </div>
 
-        {/* Only show login fields if no active session */}
-        {!hasActiveSession && (
-          <div className="space-y-4 mb-6">
-            <Input
-              label={language === 'TR' ? 'Bluesky Kullanıcı Adı' : 'Bluesky Username'}
-              placeholder="username.bsky.social"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-            
-            <Input
-              label={language === 'TR' ? 'Bluesky Şifresi (App Password)' : 'Bluesky Password (App Password)'}
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="App Password"
-            />
-          </div>
-        )}
-
         {/* Show user information when session is active */}
-        {hasActiveSession && (
+        {hasActiveSession ? (
           <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
             <p className="flex items-center text-blue-700 dark:text-blue-400">
               <FiCheck className="mr-2" />
@@ -425,23 +469,29 @@ const UnfollowAll: React.FC = () => {
                 ? `${sessionHandle} hesabıyla giriş yaptınız.` 
                 : `Logged in as ${sessionHandle}.`}
             </p>
+            
+            {/* Show cache information if available */}
+            {cacheInfo && (
+              <p className="flex items-center text-blue-700 dark:text-blue-400 mt-2 text-sm">
+                <FiInfo className="mr-2" />
+                {language === 'TR' 
+                  ? `Önbellek verileri kullanılıyor (${cacheInfo.age} önce kaydedilmiş).` 
+                  : `Using cached data (saved ${formatTimeAgo(cacheInfo.timestamp)}).`}
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+            <p className="flex items-center text-yellow-700 dark:text-yellow-400">
+              <FiInfo className="mr-2" />
+              {language === 'TR' 
+                ? 'Giriş yapmadınız. Lütfen önce ana sayfadan giriş yapın.' 
+                : 'You are not logged in. Please login from the main page first.'}
+            </p>
           </div>
         )}
 
         <div className="flex space-x-4 pt-2 mb-6">
-          {/* Show fetch button only if not logged in */}
-          {!hasActiveSession && (
-            <Button
-              onClick={fetchFollowingUsers}
-              isLoading={isLoadingUsers}
-              variant="secondary"
-              className="flex items-center"
-            >
-              <FiUsers className="mr-2" />
-              {language === 'TR' ? 'Takip Edilen Hesapları Getir' : 'Fetch Following Accounts'}
-            </Button>
-          )}
-          
           {/* Always show unfollow button, but disabled if no following users */}
           <Button
             onClick={() => setShowConfirmModal(true)}

@@ -382,15 +382,20 @@ const FollowerAnalysis: React.FC = () => {
       
       setUnfollowProgress({ completed: 0, total: usersToUnfollow.length });
       
+      // Eğer geçerli bir oturum varsa, şifreye gerek olmadan işlemi gerçekleştir
+      // Yoksa, kullanıcının girdiği şifreyi kullan
+      const passwordToUse = validSession ? null : password;
+      
       const unfollowResult = await batchUnfollowUsersWithProgress(
         username,
-        password, // Always pass password even if validSession is true
+        passwordToUse,
         usersToUnfollow,
         0,
         (completed, total, lastError) => {
           // Update progress
           setUnfollowProgress({ completed, total });
           if (lastError) {
+            setDebugInfo(lastError);
             // Show critical errors
             if (lastError.error && lastError.message) {
               setUnfollowError(`Error during operation: ${lastError.message}`);
@@ -410,8 +415,12 @@ const FollowerAnalysis: React.FC = () => {
         setDebugInfo(unfollowResult.errors[unfollowResult.errors.length - 1]);
       }
       
-      // Analizi yenile - force refresh to get latest data after unfollow
+      // Başarılı işlemler sonrası önbelleği temizle
       if (unfollowResult.success > 0) {
+        // Önbelleği geçersiz kıl
+        await invalidateAnalysisCache(username);
+        
+        // Analizi yenile - API'dan en son verileri al
         const newAnalysis = await analyzeFollowers(username, { forceRefresh: true });
         setFollowersData(newAnalysis);
       }
@@ -476,9 +485,12 @@ const FollowerAnalysis: React.FC = () => {
     setFollowProgress({ completed: 0, total: usersToFollow.length });
 
     try {
+      // Eğer geçerli bir oturum varsa, şifreye gerek olmadan işlemi gerçekleştir
+      const passwordToUse = validSession ? null : password;
+      
       const followResult = await batchFollowUsers(
         username,
-        password,
+        passwordToUse,
         usersToFollow,
         (completed, total, lastError) => {
           setFollowProgress({ completed, total });
@@ -498,8 +510,12 @@ const FollowerAnalysis: React.FC = () => {
         setDebugInfo(followResult.errors[followResult.errors.length - 1]);
       }
       
-      // Refresh analysis after following - force refresh to get latest data
+      // Başarılı işlemler sonrası önbelleği temizle
       if (followResult.success > 0) {
+        // Önbelleği geçersiz kıl
+        await invalidateAnalysisCache(username);
+        
+        // Analizi yenile - API'dan en son verileri al
         const newAnalysis = await analyzeFollowers(username, { forceRefresh: true });
         setFollowersData(newAnalysis);
       }
