@@ -11,8 +11,23 @@ import StatusIndicator from '../components/trends/StatusIndicator';
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Bluesky Trend Etiketler" },
-    { name: "description", content: "Bluesky'daki güncel trend etiketleri keşfedin" },
+    { title: "Bluesky Trend Etiketler | BlueAnalyze" },
+    { name: "description", content: "Bluesky'daki güncel trend etiketleri ve popüler hashtag'leri keşfedin. Gerçek zamanlı güncellemeleri takip edin ve sosyal medya hareketliliğini analiz edin." },
+    { name: "keywords", content: "bluesky, bluesky trends, trend analizi, hashtag, popüler etiketler, sosyal medya istatistikleri" },
+    // Open Graph / Facebook
+    { property: "og:type", content: "website" },
+    { property: "og:url", content: "https://blue-analyze.com/trends" },
+    { property: "og:title", content: "Bluesky Trend Etiketler | BlueAnalyze" },
+    { property: "og:description", content: "Bluesky'daki güncel trend etiketleri ve popüler hashtag'leri keşfedin. Gerçek zamanlı güncellemeleri takip edin." },
+    { property: "og:image", content: "https://blue-analyze.com/blueanalyze.png" },
+    // Twitter
+    { property: "twitter:card", content: "summary_large_image" },
+    { property: "twitter:url", content: "https://blue-analyze.com/trends" },
+    { property: "twitter:title", content: "Bluesky Trend Etiketler | BlueAnalyze" },
+    { property: "twitter:description", content: "Bluesky'daki güncel trend etiketleri ve popüler hashtag'leri keşfedin. Gerçek zamanlı güncellemeleri takip edin." },
+    { property: "twitter:image", content: "https://blue-analyze.com/blueanalyze.png" },
+    // Canonical URL
+    { tagName: "link", rel: "canonical", href: "https://blue-analyze.com/trends" },
   ];
 }
 
@@ -159,6 +174,37 @@ export default function TrendsPage() {
       </main>
       
       <Footer />
+      
+      {/* Schema.org JSON-LD veri işaretlemesi */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{
+        __html: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "WebPage",
+          "name": "Bluesky Trend Etiketler | BlueAnalyze",
+          "description": "Bluesky'daki güncel trend etiketleri ve popüler hashtag'leri keşfedin.",
+          "url": "https://blue-analyze.com/trends",
+          "publisher": {
+            "@type": "Organization",
+            "name": "BlueAnalyze",
+            "logo": {
+              "@type": "ImageObject",
+              "url": "https://blue-analyze.com/blueanalyze.png"
+            }
+          },
+          "mainEntity": {
+            "@type": "ItemList",
+            "itemListElement": trends.slice(0, 10).map((trend, index) => ({
+              "@type": "ListItem",
+              "position": index + 1,
+              "item": {
+                "@type": "Thing",
+                "name": trend.tag,
+                "url": `https://bsky.app/search?q=${encodeURIComponent(trend.tag)}`
+              }
+            }))
+          }
+        })
+      }} />
     </div>
   );
 } 
