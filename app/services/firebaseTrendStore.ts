@@ -1,26 +1,26 @@
 // Firebase Trend Store - Merkezi trend verileri için Firebase hizmeti
 import { ref, set, onValue, get, query, orderByChild, limitToLast } from 'firebase/database';
-// SSR sırasında window kontrolü ile koşullu import yapalım
+import type { Trend } from './trendingAPI';
+
+// Tarayıcı ortamında kullanım için güvenli db değişkeni
 let db: any = null;
 
-// SSR için güvenli import
-if (typeof window !== 'undefined') {
-  // Sadece tarayıcı ortamında çalıştır
-  try {
-    // require yerine dynamic import kullanıyoruz (ESM uyumlu)
-    import('./firebaseConfig').then(firebaseConfig => {
-      db = firebaseConfig.db;
-    }).catch(e => {
-      console.error('Firebase config yüklenemedi:', e);
-    });
-  } catch (e) {
-    console.error('Firebase config yükleme hatası:', e);
+// Firebase database'e bağlanma işlevi - lazy loading ile
+async function connectToFirebase() {
+  // Sadece istemci tarafında ve db tanımlanmamışsa
+  if (typeof window !== 'undefined' && !db) {
+    try {
+      // FirebaseConfig modülünü yüklemeyi dene
+      const firebaseModule = await import('./firebaseConfig');
+      db = firebaseModule.db;
+      return db;
+    } catch (error) {
+      console.error('Firebase bağlantısı başlatılamadı:', error);
+      return null;
+    }
   }
+  return db;
 }
-
-import type { Trend } from './trendingAPI';
-// İçeri aktarılan COUNTRIES'yi kaldırıyorum, kullanırken API'den alacağız
-// import { COUNTRIES } from './trendingAPI';
 
 // TTL değeri - 24 saat (milisaniye cinsinden)
 const DATA_EXPIRY_TIME = 24 * 60 * 60 * 1000;
@@ -71,11 +71,14 @@ export class FirebaseTrendStore {
   }
 
   // Tag'i artır
-  public incrementTag(tag: string, country: string = 'global'): void {
+  public async incrementTag(tag: string, country: string = 'global'): Promise<void> {
     try {
-      // SSR veya db null ise işlemi atla
-      if (!db || typeof window === 'undefined') {
-        console.warn('Firebase Database mevcut değil, işlem atlanıyor');
+      // Firebase'e bağlan
+      const database = await connectToFirebase();
+      
+      // DB null ise işlemi atla
+      if (!database) {
+        console.warn('Firebase Database bağlantısı kurulamadı, işlem atlanıyor');
         return;
       }
       
@@ -84,7 +87,7 @@ export class FirebaseTrendStore {
       
       // Trend yolu
       const trendPath = `trends/${country}/${cleanTag}`;
-      const trendRef = ref(db, trendPath);
+      const trendRef = ref(database, trendPath);
       
       // Önce mevcut değeri oku
       get(trendRef).then((snapshot) => {
@@ -135,14 +138,17 @@ export class FirebaseTrendStore {
   // Trendleri getir
   public async getTrends(country: string = 'global', limit: number = 20): Promise<Trend[]> {
     try {
-      // SSR veya db null ise boş array dön
-      if (!db || typeof window === 'undefined') {
-        console.warn('Firebase Database mevcut değil, boş trend listesi dönülüyor');
+      // Firebase'e bağlan
+      const database = await connectToFirebase();
+      
+      // DB null ise boş array dön
+      if (!database) {
+        console.warn('Firebase Database bağlantısı kurulamadı, boş trend listesi dönülüyor');
         return [];
       }
       
       // Veritabanı referansını al - orderByChild yerine doğrudan referans kullan
-      const trendsRef = ref(db, `trends/${country}`);
+      const trendsRef = ref(database, `trends/${country}`);
       
       // Doğrudan tüm verileri al (orderByChild kullanmadan)
       const snapshot = await get(trendsRef);
@@ -207,9 +213,12 @@ export class FirebaseTrendStore {
   // Eski verileri temizle - günlük olarak çalıştırılabilir
   public async cleanupExpiredData(): Promise<void> {
     try {
-      // SSR veya db null ise işlemi atla
-      if (!db || typeof window === 'undefined') {
-        console.warn('Firebase Database mevcut değil, temizlik atlanıyor');
+      // Firebase'e bağlan
+      const database = await connectToFirebase();
+      
+      // DB null ise işlemi atla
+      if (!database) {
+        console.warn('Firebase Database bağlantısı kurulamadı, temizlik atlanıyor');
         return;
       }
       
@@ -217,7 +226,7 @@ export class FirebaseTrendStore {
       
       // Ülke kodlarını kullan (Circular dependency'den kaçınmak için)
       for (const countryCode of COUNTRY_CODES) {
-        const trendsRef = ref(db, `trends/${countryCode}`);
+        const trendsRef = ref(database, `trends/${countryCode}`);
         
         // Verileri oku
         const snapshot = await get(trendsRef);
@@ -241,7 +250,7 @@ export class FirebaseTrendStore {
             
             if (now - updatedAt > DATA_EXPIRY_TIME) {
               // Süre dolmuş veriyi sil
-              await set(ref(db, `trends/${countryCode}/${key}`), null);
+              await set(ref(database, `trends/${countryCode}/${key}`), null);
               console.log(`Eski veri silindi: ${key} (${countryCode})`);
             }
           } catch (itemError) {
@@ -281,5 +290,13 @@ export function getFirebaseTrendStore(): FirebaseTrendStore {
 
 // Eğer tarayıcı ortamında isek, temizlik zamanlayıcısını başlat
 if (typeof window !== 'undefined') {
-  getFirebaseTrendStore(); // Singleton instance'ı oluştur ve temizlik zamanlayıcısını başlat
+  // Sayfanın yüklenmesi tamamlandığında Firebase bağlantısını başlat
+  window.addEventListener('load', () => {
+    connectToFirebase().then(() => {
+      console.log('Firebase bağlantısı başlatıldı');
+      getFirebaseTrendStore(); // Singleton instance'ı oluştur ve temizlik zamanlayıcısını başlat
+    }).catch(error => {
+      console.error('Firebase bağlantısı başlatılamadı:', error);
+    });
+  });
 } 
