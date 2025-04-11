@@ -1611,7 +1611,7 @@ const FollowerAnalysis: React.FC = () => {
                   variant="outline"
                   size="sm"
                 >
-                  Yeni Arama
+                  {t.newSearch}
                 </Button>
               </div>
             )}

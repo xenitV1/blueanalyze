@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import type { Trend } from '../../services/trendingAPI';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface TrendItemProps {
   trend: Trend;
@@ -8,6 +9,22 @@ interface TrendItemProps {
 }
 
 const TrendItem: React.FC<TrendItemProps> = ({ trend, index }) => {
+  const { language } = useLanguage();
+  
+  // Add translations for "posts"
+  const translations = {
+    EN: {
+      posts: "posts",
+      viewTagOnBluesky: "View tag #${tag} on Bluesky"
+    },
+    TR: {
+      posts: "gönderi",
+      viewTagOnBluesky: "Bluesky'da #${tag} etiketini görüntüle"
+    }
+  };
+  
+  const t = translations[language];
+  
   // Animasyon zamanlamasını sıraya göre geciktirme
   const delay = index * 0.05;
   
@@ -36,7 +53,7 @@ const TrendItem: React.FC<TrendItemProps> = ({ trend, index }) => {
       transition={{ duration: 0.3, delay }}
       className={`p-4 rounded-lg border ${getColor(trend.count)} flex justify-between items-center mb-2 cursor-pointer hover:shadow-md transition-shadow duration-200`}
       onClick={handleClick}
-      title={`Bluesky'da #${trend.tag} etiketini görüntüle`}
+      title={translations[language].viewTagOnBluesky.replace('${tag}', trend.tag)}
     >
       <div className="flex items-center">
         <span className="text-xl mr-3 font-bold">{index + 1}</span>
@@ -45,7 +62,7 @@ const TrendItem: React.FC<TrendItemProps> = ({ trend, index }) => {
       
       <div className="flex items-center">
         <span className="bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2 py-1 rounded-full text-sm flex items-center">
-          <span>{trend.count} gönderi</span>
+          <span>{trend.count} {t.posts}</span>
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
           </svg>

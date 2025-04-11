@@ -17,9 +17,10 @@ interface TargetUserCardProps {
   onSelectFollowing: () => void;
   isLoading: boolean;
   t: any; // Translations
+  language: string; // Add language prop
 }
 
-const TargetUserCard: React.FC<TargetUserCardProps> = ({ user, onSelectFollowers, onSelectFollowing, isLoading, t }) => {
+const TargetUserCard: React.FC<TargetUserCardProps> = ({ user, onSelectFollowers, onSelectFollowing, isLoading, t, language }) => {
   return (
     <Card className="my-4 overflow-hidden">
       <div className="flex items-center p-4">
@@ -35,10 +36,10 @@ const TargetUserCard: React.FC<TargetUserCardProps> = ({ user, onSelectFollowers
           <p className="text-sm text-gray-500 dark:text-gray-400">@{user.handle}</p>
           <div className="flex mt-2 space-x-4 text-sm">
             <span className="text-gray-700 dark:text-gray-300">
-              <strong>{user.followersCount || 0}</strong> takipçi
+              <strong>{user.followersCount || 0}</strong> {language === 'EN' ? 'followers' : 'takipçi'}
             </span>
             <span className="text-gray-700 dark:text-gray-300">
-              <strong>{user.followsCount || 0}</strong> takip
+              <strong>{user.followsCount || 0}</strong> {language === 'EN' ? 'following' : 'takip'}
             </span>
           </div>
         </div>
@@ -189,7 +190,7 @@ const TargetFollow: React.FC = () => {
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchTerm.trim()) {
-      setError('Lütfen bir kullanıcı adı girin');
+      setError(t.usernameRequired);
       return;
     }
     
@@ -222,10 +223,10 @@ const TargetFollow: React.FC = () => {
           setTargetUser(results[0]);
         }
       } else {
-        setError('Kullanıcı bulunamadı');
+        setError(t.userNotFound);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Kullanıcı arama başarısız oldu');
+      setError(err instanceof Error ? err.message : (language === 'EN' ? 'User search failed' : 'Kullanıcı arama başarısız oldu'));
     } finally {
       setIsSearching(false);
     }
@@ -273,7 +274,7 @@ const TargetFollow: React.FC = () => {
     
     setIsAnalyzing(true);
     setError(null);
-    setAnalysisProgress({ phase: 'Takipçiler Alınıyor', completed: 0, total: 100 });
+    setAnalysisProgress({ phase: language === 'EN' ? 'Getting Followers' : 'Takipçiler Alınıyor', completed: 0, total: 100 });
 
     try {
       // Aktif oturum kontrolü
@@ -288,7 +289,7 @@ const TargetFollow: React.FC = () => {
       
       // Hedef kullanıcının tüm takipçilerini al
       setIsProcessing(true);
-      setAnalysisProgress({ phase: 'Takipçiler Alınıyor', completed: 0, total: 100 });
+      setAnalysisProgress({ phase: language === 'EN' ? 'Getting Followers' : 'Takipçiler Alınıyor', completed: 0, total: 100 });
       
       // Kullanıcının tahmini takipçi sayısı
       const estimatedFollowerCount = targetUser.followersCount || 0;
@@ -298,14 +299,14 @@ const TargetFollow: React.FC = () => {
       const allFollowers = await getUserFollowers(targetUser.did, fetchLimit);
       
       // Takipçi alımı bitti, şimdi filtreleme aşaması
-      setAnalysisProgress({ phase: 'Takipçiler Filtreleniyor', completed: 0, total: 100 });
+      setAnalysisProgress({ phase: language === 'EN' ? 'Filtering Followers' : 'Takipçiler Filtreleniyor', completed: 0, total: 100 });
       
       // İlk olarak önbelleğe alınmış takip edilen verilerini kontrol et
       const cachedFollowingDids = await getCachedUserFollows();
       
       if (cachedFollowingDids) {
         // Önbellekten takip edilen verilerini kullan
-        setAnalysisProgress({ phase: 'Önbellekten Filtreleniyor', completed: 0, total: 100 });
+        setAnalysisProgress({ phase: language === 'EN' ? 'Filtering From Cache' : 'Önbellekten Filtreleniyor', completed: 0, total: 100 });
         
         // Takip edilmeyen kullanıcıları filtrele
         const notFollowing = allFollowers.filter(user => !cachedFollowingDids.has(user.did));
@@ -339,7 +340,7 @@ const TargetFollow: React.FC = () => {
           // 100'den fazla takip edileni varsa, sayfalar halinde tümünü al
           if (cursor) {
             setAnalysisProgress({ 
-              phase: 'Kendi Takip Edilenleriniz Alınıyor', 
+              phase: language === 'EN' ? 'Getting Your Following' : 'Kendi Takip Edilenleriniz Alınıyor', 
               completed: allUserFollowing.length, 
               total: Math.min(5000, totalFollowing * 2) // tahmini toplam
             });
@@ -357,7 +358,7 @@ const TargetFollow: React.FC = () => {
                   cursor = nextPage.data.cursor;
                   
                   setAnalysisProgress({ 
-                    phase: 'Kendi Takip Edilenleriniz Alınıyor', 
+                    phase: language === 'EN' ? 'Getting Your Following' : 'Kendi Takip Edilenleriniz Alınıyor', 
                     completed: allUserFollowing.length, 
                     total: Math.min(5000, totalFollowing * 2)
                   });
@@ -374,7 +375,7 @@ const TargetFollow: React.FC = () => {
             }
           }
           
-          setAnalysisProgress({ phase: 'Takip Edilmeyenler Filtreleniyor', completed: 0, total: 100 });
+          setAnalysisProgress({ phase: language === 'EN' ? 'Filtering Non-Following' : 'Takip Edilmeyenler Filtreleniyor', completed: 0, total: 100 });
           
           // Takip edilmeyen kullanıcıları filtrele
           const followingDids = new Set(allUserFollowing.map((u: any) => u.did));
@@ -396,7 +397,7 @@ const TargetFollow: React.FC = () => {
       setShowFollowOptions(true);
       setIsProcessing(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Takip analizi başarısız oldu');
+      setError(err instanceof Error ? err.message : t.analysisFailed);
       setIsProcessing(false);
     } finally {
       setIsAnalyzing(false);
@@ -409,7 +410,7 @@ const TargetFollow: React.FC = () => {
     
     setIsAnalyzing(true);
     setError(null);
-    setAnalysisProgress({ phase: 'Takip Edilenler Alınıyor', completed: 0, total: 100 });
+    setAnalysisProgress({ phase: language === 'EN' ? 'Getting Following Users' : 'Takip Edilenler Alınıyor', completed: 0, total: 100 });
 
     try {
       // Aktif oturum kontrolü
@@ -424,7 +425,7 @@ const TargetFollow: React.FC = () => {
       
       // Hedef kullanıcının tüm takip ettiklerini al
       setIsProcessing(true);
-      setAnalysisProgress({ phase: 'Takip Edilenler Alınıyor', completed: 0, total: 100 });
+      setAnalysisProgress({ phase: language === 'EN' ? 'Getting Following Users' : 'Takip Edilenler Alınıyor', completed: 0, total: 100 });
       
       // Kullanıcının tahmini takip ettiği sayısı
       const estimatedFollowingCount = targetUser.followsCount || 0;
@@ -434,14 +435,14 @@ const TargetFollow: React.FC = () => {
       const allFollowing = await getUserFollowing(targetUser.did, fetchLimit);
       
       // Takip edilen alımı bitti, şimdi filtreleme aşaması
-      setAnalysisProgress({ phase: 'Takip Edilenler Filtreleniyor', completed: 0, total: 100 });
+      setAnalysisProgress({ phase: language === 'EN' ? 'Filtering Following Users' : 'Takip Edilenler Filtreleniyor', completed: 0, total: 100 });
       
       // İlk olarak önbelleğe alınmış takip edilen verilerini kontrol et
       const cachedFollowingDids = await getCachedUserFollows();
       
       if (cachedFollowingDids) {
         // Önbellekten takip edilen verilerini kullan
-        setAnalysisProgress({ phase: 'Önbellekten Filtreleniyor', completed: 0, total: 100 });
+        setAnalysisProgress({ phase: language === 'EN' ? 'Filtering From Cache' : 'Önbellekten Filtreleniyor', completed: 0, total: 100 });
         
         // Takip edilmeyen kullanıcıları filtrele
         const notFollowing = allFollowing.filter(user => !cachedFollowingDids.has(user.did));
@@ -475,7 +476,7 @@ const TargetFollow: React.FC = () => {
           // 100'den fazla takip edileni varsa, sayfalar halinde tümünü al
           if (cursor) {
             setAnalysisProgress({ 
-              phase: 'Kendi Takip Edilenleriniz Alınıyor', 
+              phase: language === 'EN' ? 'Getting Your Following' : 'Kendi Takip Edilenleriniz Alınıyor', 
               completed: allUserFollowing.length, 
               total: Math.min(5000, totalFollowing * 2) // tahmini toplam
             });
@@ -493,7 +494,7 @@ const TargetFollow: React.FC = () => {
                   cursor = nextPage.data.cursor;
                   
                   setAnalysisProgress({ 
-                    phase: 'Kendi Takip Edilenleriniz Alınıyor', 
+                    phase: language === 'EN' ? 'Getting Your Following' : 'Kendi Takip Edilenleriniz Alınıyor', 
                     completed: allUserFollowing.length, 
                     total: Math.min(5000, totalFollowing * 2)
                   });
@@ -510,7 +511,7 @@ const TargetFollow: React.FC = () => {
             }
           }
           
-          setAnalysisProgress({ phase: 'Takip Edilmeyenler Filtreleniyor', completed: 0, total: 100 });
+          setAnalysisProgress({ phase: language === 'EN' ? 'Filtering Non-Following' : 'Takip Edilmeyenler Filtreleniyor', completed: 0, total: 100 });
           
           // Takip edilmeyen kullanıcıları filtrele
           const followingDids = new Set(allUserFollowing.map((u: any) => u.did));
@@ -532,7 +533,7 @@ const TargetFollow: React.FC = () => {
       setShowFollowOptions(true);
       setIsProcessing(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Takip analizi başarısız oldu');
+      setError(err instanceof Error ? err.message : t.analysisFailed);
       setIsProcessing(false);
     } finally {
       setIsAnalyzing(false);
@@ -560,7 +561,7 @@ const TargetFollow: React.FC = () => {
     setError(null);
     
     if (!targetUser || !followType || targetUsers.length === 0) {
-      setError('Hedef kullanıcı veya takip türü seçilmedi');
+      setError(language === 'EN' ? 'Target user or follow type not selected' : 'Hedef kullanıcı veya takip türü seçilmedi');
       return;
     }
     
@@ -649,7 +650,7 @@ const TargetFollow: React.FC = () => {
       if (error instanceof Error && error.name === 'AbortError') {
         console.log('Operation was aborted by user');
       } else {
-        setError(error instanceof Error ? error.message : 'Takip işlemi başarısız oldu');
+        setError(error instanceof Error ? error.message : (language === 'EN' ? 'Follow operation failed' : 'Takip işlemi başarısız oldu'));
       }
       
       // Hata durumunda operation'ı sıfırla
@@ -723,7 +724,7 @@ const TargetFollow: React.FC = () => {
             <div className="flex items-center">
               <FiLoader className="animate-spin mr-2" />
               <span>
-                {operation.targetUserDisplayName} {operation.followType === 'followers' ? 'takipçileri' : 'takip ettikleri'} takip ediliyor: 
+                {operation.targetUserDisplayName} {operation.followType === 'followers' ? (language === 'EN' ? 'followers' : 'takipçileri') : (language === 'EN' ? 'following' : 'takip ettikleri')} {language === 'EN' ? 'are being followed:' : 'takip ediliyor:'} 
                 {operation.completed}/{operation.totalUsers}
               </span>
             </div>
@@ -732,7 +733,7 @@ const TargetFollow: React.FC = () => {
               variant={isPaused ? "primary" : "danger"}
               size="sm"
             >
-              {isPaused ? "Devam Et" : "Durdur"}
+              {isPaused ? t.resume : t.pause}
             </Button>
           </div>
         </div>
@@ -775,12 +776,13 @@ const TargetFollow: React.FC = () => {
           onSelectFollowing={handleSelectFollowing}
           isLoading={isAnalyzing}
           t={t}
+          language={language}
         />
       )}
       
       {isProcessing && (
         <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
-          <h3 className="text-lg font-bold mb-2">{analysisProgress.phase || (followType === 'followers' ? 'Takipçileri Analiz Ediliyor...' : 'Takip Edilenleri Analiz Ediliyor...')}</h3>
+          <h3 className="text-lg font-bold mb-2">{analysisProgress.phase || (followType === 'followers' ? (language === 'EN' ? 'Analyzing Followers...' : 'Takipçileri Analiz Ediliyor...') : (language === 'EN' ? 'Analyzing Following...' : 'Takip Edilenleri Analiz Ediliyor...'))}</h3>
           <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-4">
             <div className="bg-blue-600 h-2.5 rounded-full animate-pulse" 
                 style={{ 
@@ -793,7 +795,7 @@ const TargetFollow: React.FC = () => {
           <p className="text-gray-600 dark:text-gray-400">
             {analysisProgress.completed > 0 && analysisProgress.total > 0 
               ? `${analysisProgress.completed} / ${analysisProgress.total}` 
-              : 'Bu işlem biraz zaman alabilir, lütfen bekleyin...'}
+              : language === 'EN' ? 'This process may take some time, please wait...' : 'Bu işlem biraz zaman alabilir, lütfen bekleyin...'}
           </p>
         </div>
       )}
@@ -804,7 +806,7 @@ const TargetFollow: React.FC = () => {
             {followType === 'followers' ? t.followFollowers : t.followFollowing}
           </h3>
           <p className="text-gray-600 dark:text-gray-400 mb-4">
-            {targetUser?.displayName || targetUser?.handle} isimli kullanıcının {followType === 'followers' ? 'takipçilerini' : 'takip ettiklerini'} analiz etmek için App Password girmelisiniz.
+            {language === 'EN' ? `You need to enter App Password to analyze ${followType === 'followers' ? 'followers' : 'following'} of ${targetUser?.displayName || targetUser?.handle}.` : `${targetUser?.displayName || targetUser?.handle} isimli kullanıcının ${followType === 'followers' ? 'takipçilerini' : 'takip ettiklerini'} analiz etmek için App Password girmelisiniz.`}
           </p>
           
           <div className="mb-4">
@@ -831,7 +833,7 @@ const TargetFollow: React.FC = () => {
               disabled={!password}
             >
               {isAnalyzing ? <FiLoader className="animate-spin mr-2" /> : <FiUserPlus className="mr-2" />}
-              Analiz Et
+              {t.analyze}
             </Button>
             <Button 
               onClick={() => {
@@ -841,7 +843,7 @@ const TargetFollow: React.FC = () => {
               variant="secondary"
               disabled={isAnalyzing}
             >
-              {language === 'TR' ? 'Geri' : 'Back'}
+              {language === 'EN' ? 'Back' : 'Geri'}
             </Button>
           </div>
         </div>
@@ -850,16 +852,15 @@ const TargetFollow: React.FC = () => {
       {showFollowOptions && filteredUsers.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow mb-4">
           <h3 className="text-lg font-bold mb-2">
-            {followType === 'followers' ? 'Takipçileri Takip Et' : 'Takip Edilenleri Takip Et'}
+            {followType === 'followers' ? (language === 'EN' ? 'Follow Followers' : 'Takipçileri Takip Et') : (language === 'EN' ? 'Follow Following' : 'Takip Edilenleri Takip Et')}
           </h3>
           
           <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200 rounded">
             <p>
-              <strong>{targetUser?.displayName || targetUser?.handle}</strong> kullanıcısının {followType === 'followers' ? 'takipçilerinden' : 'takip ettiklerinden'}{' '}
-              <strong>{filteredUsers.length}</strong> hesabı henüz takip etmiyorsunuz.
+              <strong>{targetUser?.displayName || targetUser?.handle}</strong> {language === 'EN' ? `has ${filteredUsers.length} ${followType === 'followers' ? 'followers' : 'following'} that you are not following yet.` : `kullanıcısının ${followType === 'followers' ? 'takipçilerinden' : 'takip ettiklerinden'} ${filteredUsers.length} hesabı henüz takip etmiyorsunuz.`}
             </p>
             <p className="mt-2">
-              Takip etmek istediğiniz hesap sayısını seçin:
+              {t.selectFollowCount}
             </p>
           </div>
           
@@ -873,7 +874,7 @@ const TargetFollow: React.FC = () => {
                 onChange={handleCustomFollowCountChange}
                 className="w-1/2"
               />
-              <span className="text-gray-600 dark:text-gray-400">/ {filteredUsers.length} hesap</span>
+              <span className="text-gray-600 dark:text-gray-400">/ {filteredUsers.length} {t.accounts}</span>
             </div>
             
             <Button
@@ -881,13 +882,13 @@ const TargetFollow: React.FC = () => {
               variant="secondary"
               className="mr-2"
             >
-              Tümünü Takip Et
+              {t.followAll}
             </Button>
             
             {filteredUsers.length >= 1000 && (
               <div className="mt-3 text-yellow-600 dark:text-yellow-400 text-sm">
                 <FiClock className="inline mr-1" />
-                Not: 1000+ hesap takip edilirken, her 1000 takip sonrası sistem 1 dakika bekleyecektir.
+                {t.rateLimit1000Note}
               </div>
             )}
           </div>
@@ -902,7 +903,7 @@ const TargetFollow: React.FC = () => {
               disabled={followCount <= 0}
             >
               <FiUserPlus className="mr-2" />
-              {followCount} Hesabı Takip Et
+              {followCount} {t.followAccounts}
             </Button>
             <Button 
               onClick={() => {
@@ -913,7 +914,7 @@ const TargetFollow: React.FC = () => {
               }} 
               variant="secondary"
             >
-              {language === 'TR' ? 'Geri' : 'Back'}
+              {language === 'EN' ? 'Back' : 'Geri'}
             </Button>
           </div>
         </div>
@@ -921,7 +922,7 @@ const TargetFollow: React.FC = () => {
       
       {(isLoading || isAnalyzing) && !isWaitingTimeout && (
         <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
-          <h3 className="text-lg font-bold mb-2">{t.processing}</h3>
+          <h3 className="text-lg font-bold mb-2">{analysisProgress.phase || t.processing}</h3>
           <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-4">
             <div 
               className="bg-blue-600 h-2.5 rounded-full" 
@@ -938,7 +939,7 @@ const TargetFollow: React.FC = () => {
               variant={isPaused ? "primary" : "danger"}
               size="sm"
             >
-              {isPaused ? "Devam Et" : "Durdur"}
+              {isPaused ? t.resume : t.pause}
             </Button>
           </div>
         </div>
@@ -948,9 +949,9 @@ const TargetFollow: React.FC = () => {
       {isWaitingTimeout && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full shadow-xl">
-            <h3 className="text-lg font-bold mb-2">Rate Limit Bekleniyor</h3>
+            <h3 className="text-lg font-bold mb-2">{t.waitingRateLimit}</h3>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
-              Bluesky API kısıtlamaları nedeniyle işleme devam etmeden önce beklemeniz gerekiyor.
+              {language === 'EN' ? "You need to wait before continuing the process due to Bluesky API limitations." : "Bluesky API kısıtlamaları nedeniyle işleme devam etmeden önce beklemeniz gerekiyor."}
             </p>
             
             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-4">
@@ -964,14 +965,14 @@ const TargetFollow: React.FC = () => {
             <div className="flex justify-between items-center">
               <div>
                 <span className="text-2xl font-bold">{Math.floor(operation.remainingTimeout / 60)}:{(operation.remainingTimeout % 60).toString().padStart(2, '0')}</span>
-                <span className="ml-2 text-gray-500">kalan süre</span>
+                <span className="ml-2 text-gray-500">{language === 'EN' ? "time remaining" : "kalan süre"}</span>
               </div>
               
               <Button 
                 onClick={handleTogglePause}
                 variant="danger"
               >
-                İşlemi Durdur
+                {t.stopProcess}
               </Button>
             </div>
           </div>
@@ -983,20 +984,20 @@ const TargetFollow: React.FC = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full shadow-xl">
             <h3 className="text-lg font-bold mb-2 flex items-center">
-              <FiCheck className="text-green-500 mr-2" /> İşlem Tamamlandı
+              <FiCheck className="text-green-500 mr-2" /> {t.processCompleted}
             </h3>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
-              {operation.targetUserDisplayName} kullanıcısının {operation.followType === 'followers' ? 'takipçileri' : 'takip ettikleri'} takip edildi.
+              {operation.targetUserDisplayName} {operation.followType === 'followers' ? t.followers : t.following} {t.haveBeenFollowed}.
             </p>
             
             <div className="flex justify-between gap-2">
               <div className="flex-1 bg-green-50 dark:bg-green-900/20 p-3 rounded-lg text-center">
-                <span className="block text-xl font-bold text-green-600 dark:text-green-400">{operation.success}</span>
-                <span className="text-sm text-green-700 dark:text-green-300">Başarılı</span>
+                <span className="block text-xl font-bold text-green-600 dark:text-green-400">{t.successful}</span>
+                <span className="text-sm text-green-700 dark:text-green-300">{t.successful}</span>
               </div>
               <div className="flex-1 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg text-center">
-                <span className="block text-xl font-bold text-red-600 dark:text-red-400">{operation.failed}</span>
-                <span className="text-sm text-red-700 dark:text-red-300">Başarısız</span>
+                <span className="block text-xl font-bold text-red-600 dark:text-red-400">{t.failed}</span>
+                <span className="text-sm text-red-700 dark:text-red-300">{t.failed}</span>
               </div>
             </div>
             
@@ -1005,7 +1006,7 @@ const TargetFollow: React.FC = () => {
                 onClick={handleReset}
                 variant="primary"
               >
-                Tamam
+                {t.ok}
               </Button>
             </div>
           </div>

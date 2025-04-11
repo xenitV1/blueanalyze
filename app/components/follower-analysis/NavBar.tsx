@@ -93,8 +93,11 @@ const NavBar: React.FC = () => {
               <div className="flex items-center text-xs md:text-sm px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300">
                 <FiActivity className="h-3 w-3 mr-1 animate-pulse" />
                 <span className="hidden md:inline-block">
-                  {operation.type === 'targetFollow' ? 'Hedef Takip: ' : 
-                   operation.type === 'follow' ? 'Takip: ' : 'Takipten Çıkma: '}
+                  {operation.type === 'targetFollow' ? 
+                    (language === 'EN' ? 'Target Follow: ' : 'Hedef Takip: ') : 
+                   operation.type === 'follow' ? 
+                    (language === 'EN' ? 'Follow: ' : 'Takip: ') : 
+                    (language === 'EN' ? 'Unfollow: ' : 'Takipten Çıkma: ')}
                 </span>
                 <span>{operation.completed}/{operation.totalUsers}</span>
               </div>

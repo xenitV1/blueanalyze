@@ -53,6 +53,18 @@ export interface Translations {
   processing: string;
   operationComplete: string;
   newSearch: string;
+  waitingRateLimit: string;
+  resume: string;
+  pause: string;
+  ok: string;
+  stopProcess: string;
+  processCompleted: string;
+  haveBeenFollowed: string;
+  selectFollowCount: string;
+  accounts: string;
+  followAccounts: string;
+  rateLimit1000Note: string;
+  targetUser: string;
   
   // Feedback
   feedbackTitle: string;
@@ -135,6 +147,18 @@ const enTranslations: Translations = {
   processing: 'Processing...',
   operationComplete: 'Operation Complete',
   newSearch: 'New Search',
+  waitingRateLimit: 'Rate Limit Waiting',
+  resume: 'Resume',
+  pause: 'Pause',
+  ok: 'OK',
+  stopProcess: 'Stop Process',
+  processCompleted: 'Process Completed',
+  haveBeenFollowed: 'have been followed',
+  selectFollowCount: 'Select how many accounts you want to follow:',
+  accounts: 'accounts',
+  followAccounts: 'Follow Accounts',
+  rateLimit1000Note: 'Note: When following 1000+ accounts, the system will wait 1 minute after every 1000 follows.',
+  targetUser: 'user',
   
   // Feedback
   feedbackTitle: 'Send Feedback',
@@ -217,6 +241,18 @@ const trTranslations: Translations = {
   processing: 'İşlem Devam Ediyor',
   operationComplete: 'İşlem Tamamlandı',
   newSearch: 'Yeni Arama',
+  waitingRateLimit: 'Rate Limit Bekleniyor',
+  resume: 'Devam Et',
+  pause: 'Durdur',
+  ok: 'Tamam',
+  stopProcess: 'İşlemi Durdur',
+  processCompleted: 'İşlem Tamamlandı',
+  haveBeenFollowed: 'takip edildi',
+  selectFollowCount: 'Takip etmek istediğiniz hesap sayısını seçin:',
+  accounts: 'hesap',
+  followAccounts: 'Hesabı Takip Et',
+  rateLimit1000Note: 'Not: 1000+ hesap takip edilirken, her 1000 takip sonrası sistem 1 dakika bekleyecektir.',
+  targetUser: 'kullanıcısının',
   
   // Feedback
   feedbackTitle: 'Geri Bildirim Gönder',
