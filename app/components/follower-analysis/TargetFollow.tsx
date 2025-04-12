@@ -755,6 +755,7 @@ const TargetFollow: React.FC = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="flex-1"
+              isBlueskyUsername={true}
             />
             <Button 
               type="submit" 

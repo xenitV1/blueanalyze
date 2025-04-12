@@ -1559,9 +1559,10 @@ const FollowerAnalysis: React.FC = () => {
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <Input
                     label={t.blueskyUsername}
-                    placeholder="e.g. username.bsky.social"
+                    placeholder="e.g. username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
+                    isBlueskyUsername={true}
                   />
                   <Input
                     label={t.blueskyPassword}

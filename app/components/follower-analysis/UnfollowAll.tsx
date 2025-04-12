@@ -559,6 +559,7 @@ const UnfollowAll: React.FC = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="flex-1"
+                isBlueskyUsername={true}
               />
               <Button
                 onClick={handleSearch}
