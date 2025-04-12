@@ -1636,7 +1636,7 @@ const FollowerAnalysis: React.FC = () => {
               >
                 <Card className="mb-8">
                   <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-white">
-                    {t.resultsFor} @{followersData.notFollowingBack[0]?.handle.split('.')[0] || username}
+                    {t.resultsFor} @{username.split('.')[0]}
                   </h2>
 
                   <div className="grid grid-cols-3 gap-4 mb-6">

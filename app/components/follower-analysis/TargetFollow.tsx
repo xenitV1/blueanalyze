@@ -105,6 +105,7 @@ const TargetFollow: React.FC = () => {
   const [followingUsers, setFollowingUsers] = useState<BlueSkyUser[]>([]);
   const [username, setUsername] = useState('');
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
+  const [showUserResults, setShowUserResults] = useState(false);
   
   // İşlem durumu için UI'da kullanılacak referanslar
   const isActiveProcess = operation.type === 'targetFollow' && operation.isProcessing;
@@ -779,6 +780,18 @@ const TargetFollow: React.FC = () => {
           t={t}
           language={language}
         />
+      )}
+      
+      {targetUser && showUserResults && (
+        <div className="mb-6">
+          <Card className="overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-500 to-purple-500 p-4">
+              <h3 className="text-xl font-bold text-white">
+                {language === 'TR' ? 'Sonuçlar' : 'Results'} - @{targetUser.handle.split('.')[0]}
+              </h3>
+            </div>
+          </Card>
+        </div>
       )}
       
       {isProcessing && (

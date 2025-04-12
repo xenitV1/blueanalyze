@@ -446,7 +446,7 @@ const UnfollowAll: React.FC = () => {
       <Card className="mb-8">
         <h2 className="text-2xl font-bold mb-6 text-red-600 dark:text-red-500 flex items-center">
           <FiUserMinus className="mr-2" /> 
-          {language === 'TR' ? 'Tüm Takip Edilen Hesapları Takipten Çıkar' : 'Unfollow All Accounts'}
+          {language === 'TR' ? 'Takipten Çıkarma' : 'Unfollow'} - {sessionHandle ? `@${sessionHandle.split('.')[0]}` : language === 'TR' ? 'Tüm Hesaplar' : 'All Accounts'}
         </h2>
         
         <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg mb-6">
