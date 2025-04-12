@@ -81,6 +81,7 @@ export interface Translations {
   sendFeedback: string;
   emailAt: string;
   connectOn: string;
+  officialAccount: string;
   
   // Footer
   allRightsReserved: string;
@@ -175,6 +176,7 @@ const enTranslations: Translations = {
   sendFeedback: 'Send Feedback',
   emailAt: 'Email us at:',
   connectOn: 'Connect on Bluesky:',
+  officialAccount: 'Official Bluesky Account',
   
   // Footer
   allRightsReserved: 'All rights reserved.',
@@ -257,18 +259,19 @@ const trTranslations: Translations = {
   // Feedback
   feedbackTitle: 'Geri Bildirim Gönder',
   feedbackIntro: 'BlueAnalyze aracı hakkındaki düşüncelerinizi değerlendiriyoruz!',
-  feedbackAbout: 'Şu konularda geri bildirim gönderebilirsiniz:',
+  feedbackAbout: 'Şunlar hakkında geri bildirim sağlayabilirsiniz:',
   featureSuggestions: 'Özellik önerileri',
   bugReports: 'Hata raporları',
   userExperience: 'Kullanıcı deneyimi iyileştirmeleri',
-  designFeedback: 'Tasarım geri bildirimleri',
-  otherFeedback: 'Paylaşmak istediğiniz diğer konular!',
+  designFeedback: 'Tasarım geri bildirimi',
+  otherFeedback: 'Paylaşmak istediğiniz başka bir şey!',
   sendEmail: 'E-posta Gönder',
   contactUs: 'Bize Ulaşın',
-  responseTime: 'Genellikle 1-2 iş günü içinde yanıt veririz.',
+  responseTime: 'Genellikle 1-2 iş günü içinde yanıt veriyoruz.',
   sendFeedback: 'Geri Bildirim Gönder',
-  emailAt: 'E-posta adresimiz:',
-  connectOn: 'Bluesky\'da bağlanın:',
+  emailAt: 'Bize e-posta gönderin:',
+  connectOn: 'Bluesky\'da bağlantı kurun:',
+  officialAccount: 'Resmi Bluesky Hesabı',
   
   // Footer
   allRightsReserved: 'Tüm hakları saklıdır.',

@@ -249,6 +249,21 @@ const Footer: React.FC = () => {
             </div>
           </div>
           
+          <div className="flex items-center p-3 bg-blue-50 dark:bg-blue-900/30 rounded-md">
+            <FiExternalLink className="text-blue-500 mr-3 flex-shrink-0" />
+            <div>
+              <p className="font-medium">{t.officialAccount}</p>
+              <a 
+                href="https://bsky.app/profile/blue-analyze.bsky.social"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                @blue-analyze.bsky.social
+              </a>
+            </div>
+          </div>
+          
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">
             {t.responseTime}
           </p>
@@ -287,6 +302,22 @@ const Footer: React.FC = () => {
               >
                 {t.contact}
               </button>
+            </div>
+            <div className="mt-4">
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                {language === 'TR' 
+                  ? 'Güncellemeler ve yeni özelliklerden haberdar olmak için resmi Bluesky hesabımızı takip etmeyi unutmayın!'
+                  : 'Follow our official Bluesky account to stay updated with the latest features and announcements!'}
+              </p>
+              <a 
+                href="https://bsky.app/profile/blue-analyze.bsky.social"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 inline-flex items-center"
+              >
+                <FiExternalLink className="mr-1" />
+                @blue-analyze.bsky.social
+              </a>
             </div>
           </div>
         </div>
