@@ -40,7 +40,7 @@ class TrendStore {
   private globalTrends: Map<string, number> = new Map();
   private countryTrends: Map<string, Map<string, number>> = new Map();
   private lastUpdated: Date = new Date();
-  private expiryTime: number = 24 * 60 * 60 * 1000; // 24 saat (milisaniye)
+  private expiryTime: number = 5 * 60 * 60 * 1000; // 5 saat (milisaniye)
   private dbName: string = 'blueanalyze_trends';
   private dbVersion: number = 1;
   private db: IDBDatabase | null = null;
@@ -221,9 +221,9 @@ class TrendStore {
   
   private cleanupExpiredData() {
     const now = new Date();
-    // Veriler 24 saatten eskiyse sıfırla
+    // Veriler 5 saatten eskiyse sıfırla
     if (now.getTime() - this.lastUpdated.getTime() >= this.expiryTime) {
-      console.log('Cleaning up expired trend data');
+      console.log('Cleaning up expired trend data - 5 saatlik veri sıfırlanıyor');
       this.globalTrends = new Map();
       COUNTRIES.forEach(country => {
         if (country.code !== 'global') {
@@ -243,6 +243,15 @@ class TrendStore {
           this.updateMetaData('lastUpdated', now.toISOString());
         } catch (error) {
           console.error('Veritabanı temizlenirken hata:', error);
+        }
+      }
+      
+      // Firebase kullanılıyorsa, Firebase verilerini de temizle
+      if (USE_FIREBASE && firebaseTrendStore) {
+        try {
+          firebaseTrendStore.resetAllTrends();
+        } catch (error) {
+          console.error('Firebase trend verileri temizlenirken hata:', error);
         }
       }
     }
@@ -291,6 +300,11 @@ class TrendStore {
       }))
       .sort((a, b) => b.count - a.count)
       .slice(0, limit);
+  }
+
+  // Trend verilerinin son güncellenme zamanını getir
+  getLastUpdatedTime(): Date {
+    return this.lastUpdated;
   }
 }
 
@@ -509,17 +523,60 @@ class JetstreamClient {
       return [];
     }
     
-    // Klasik hashtag regex (# işareti ile başlayan kelimeler)
+    // Geliştirilmiş hashtag regex - daha güvenli ve doğru eşleşmeler için
+    // Türkçe karakterleri de destekler
     const hashtagRegex = /#([a-zA-Z0-9_üşıöğçÜŞİÖĞÇ]+)/g;
     const matches = text.match(hashtagRegex);
     
     if (matches && matches.length > 0) {
       // '#' işaretini kaldır ve küçük harfe çevir
-      const hashtags = matches.map(tag => tag.slice(1).toLowerCase());
-      return hashtags;
+      const rawHashtags = matches.map(tag => tag.slice(1).toLowerCase());
+      
+      // Hashtag'leri filtrele
+      const filteredHashtags = this.filterHashtags(rawHashtags);
+      return filteredHashtags;
     }
     
     return [];
+  }
+  
+  // Hashtag'leri filtrele - spam ve gereksiz hashtag'leri kaldırır
+  private filterHashtags(hashtags: string[]): string[] {
+    if (!hashtags || hashtags.length === 0) return [];
+    
+    return hashtags.filter(tag => {
+      // Minimum uzunluk kontrolü (en az 2 karakter olmalı)
+      if (tag.length < 2) return false;
+      
+      // Maksimum uzunluk kontrolü (50 karakterden fazla olmamalı)
+      if (tag.length > 50) return false;
+      
+      // Sadece sayılardan oluşan hashtag'leri ele - bunlar genellikle anlamlı değil
+      // Örneğin: #123, #2023 gibi
+      if (/^\d+$/.test(tag)) return false;
+      
+      // Tek bir harfin tekrarından oluşan hashtag'leri ele
+      // Örneğin: #aaaaa, #bbbbb gibi
+      if (/^(.)\1{3,}$/.test(tag)) return false;
+      
+      // Çok fazla tekrarlayan karakter içerenleri ele
+      // Örneğin: #heyyyyyyyy, #goooooood gibi
+      if (/(.)\1{4,}/.test(tag)) return false;
+      
+      // Anlamsız karakter kombinasyonlarını filtreleme
+      // Örneğin: #asdf, #qwerty, #abcdef gibi klavye dizilimleri
+      const commonNonsense = ['asdf', 'qwerty', 'zxcvbn', '12345', 'abcdef'];
+      if (commonNonsense.some(pattern => tag.includes(pattern))) return false;
+      
+      // Çok kısa hashtag'ler anlamlı olmalı (2-3 karakter)
+      if (tag.length <= 3) {
+        // Anlamlı kısaltmalar listesi (örnek olarak)
+        const meaningfulShortTags = ['ai', 'ui', 'ux', 'ar', 'vr', 'nft', 'btc', 'eth', 'js', 'css', 'php', 'c', 'py'];
+        if (!meaningfulShortTags.includes(tag)) return false;
+      }
+      
+      return true;
+    });
   }
   
   // Dil kodlarından ülke kodlarına dönüşüm için yardımcı metot
@@ -585,6 +642,11 @@ class JetstreamClient {
           // Hashtag'i küçük harfe çevir ve işle
           const cleanedHashtag = hashtag.toLowerCase().trim();
           
+          // Hashtag'in anlamlı olup olmadığını kontrol et
+          if (this.isSpamOrNoise(cleanedHashtag)) {
+            return; // Spam veya anlamsız hashtag'leri atla
+          }
+          
           if (cleanedHashtag.length < 1 || cleanedHashtag.length > 50) {
             return; // Çok kısa veya çok uzun hashtag'leri atla
           }
@@ -606,6 +668,11 @@ class JetstreamClient {
         try {
           const cleanedHashtag = hashtag.toLowerCase().trim();
           
+          // Hashtag'in anlamlı olup olmadığını kontrol et
+          if (this.isSpamOrNoise(cleanedHashtag)) {
+            return; // Spam veya anlamsız hashtag'leri atla
+          }
+          
           if (cleanedHashtag.length > 0) {
             trendStore.incrementTag(cleanedHashtag, countryCode);
           }
@@ -614,6 +681,42 @@ class JetstreamClient {
         }
       });
     }
+  }
+  
+  // Hashtag'in spam veya anlamsız olup olmadığını kontrol et
+  private isSpamOrNoise(tag: string): boolean {
+    // Tek karakterli hashtag'ler anlamlı değil
+    if (tag.length < 2) return true;
+    
+    // Sadece sayılardan oluşan hashtag'ler anlamlı değil (yıl hariç)
+    // Yıl (1900-2100 arası) olma potansiyeli var mı?
+    const isYear = /^(19\d\d|20\d\d)$/.test(tag);
+    
+    if (/^\d+$/.test(tag) && !isYear) return true;
+    
+    // Sadece tekrarlanan karakterlerden oluşan hashtag'ler
+    if (/^(.)\1+$/.test(tag)) return true;
+    
+    // Belli karakter sayısından sonra tekrarlanan karakterler içeren hashtag'ler
+    // Örneğin: "helloooooooo", "wowwwwwww"
+    if (/(.)\1{4,}/.test(tag)) return true;
+    
+    // Anlamsız klavye dizilimleri
+    const nonsensePatterns = ['asdf', 'qwert', 'zxcvb', '12345', 'abcde'];
+    if (nonsensePatterns.some(pattern => tag.includes(pattern))) return true;
+    
+    // Bot veya spam olabilecek çok uzun anlamsız karakterler
+    if (tag.length > 30) {
+      // Uzun bir hashtag'de anlamlı kelimeler olma olasılığı düşükse spam olabilir
+      // Sesli harf oranı: Anlamlı metinlerde genellikle sesli harfler belirli bir oranda bulunur
+      const vowels = tag.match(/[aeioöuüıiAEIOÖUÜIİ]/g) || [];
+      const vowelRatio = vowels.length / tag.length;
+      
+      // Sesli harf oranı çok düşükse (<%10) veya çok yüksekse (>%60) anlamsız olabilir
+      if (vowelRatio < 0.1 || vowelRatio > 0.6) return true;
+    }
+    
+    return false;
   }
   
   // Bağlantı durumunu getir
@@ -660,6 +763,16 @@ export function getConnectionStatus(): ConnectionStatus {
   }
   
   return jetstreamClient.getStatus();
+}
+
+// Trend verilerinin son güncellenme zamanını getir
+export function getLastUpdatedTime(): Date {
+  // Firebase kullanılıyorsa Firebase'den, yoksa local trendStore'dan son güncelleme zamanını getir
+  if (USE_FIREBASE && firebaseTrendStore) {
+    return firebaseTrendStore.getLastUpdatedTime();
+  }
+  
+  return trendStore.getLastUpdatedTime();
 }
 
 // Eğer bu modül bir tarayıcı ortamında çalışıyorsa, otomatik başlat

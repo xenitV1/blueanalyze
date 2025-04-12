@@ -34,6 +34,7 @@ function sanitizeTagForFirebase(tag: string): string {
 export class FirebaseTrendStore {
   private static instance: FirebaseTrendStore;
   private scheduledCleanup: NodeJS.Timeout | null = null;
+  private lastUpdated: Date = new Date(); // Son güncelleme zamanını takip et
 
   // Singleton instance için
   public static getInstance(): FirebaseTrendStore {
@@ -59,6 +60,9 @@ export class FirebaseTrendStore {
         });
       }, 30 * 60 * 1000); // 30 dakika
     }
+    
+    // Son güncelleme zamanını şimdiki zaman olarak ayarla
+    this.lastUpdated = new Date();
   }
 
   // Tag'i artır
@@ -112,6 +116,9 @@ export class FirebaseTrendStore {
           .then(() => {
             // Success
             console.log(`"${cleanTag}" etiketi güncellendi, sayı: ${count}`);
+            
+            // Son güncelleme zamanını güncelle
+            this.lastUpdated = new Date();
           })
           .catch((error) => {
             // Hata daha ayrıntılı bir şekilde işleniyor
@@ -211,6 +218,7 @@ export class FirebaseTrendStore {
       }
       
       const now = new Date().getTime();
+      let dataWasDeleted = false;
       
       // Ülke kodlarını kullan (Circular dependency'den kaçınmak için)
       for (const countryCode of COUNTRY_CODES) {
@@ -240,6 +248,7 @@ export class FirebaseTrendStore {
               // Süre dolmuş veriyi sil
               await set(ref(db, `trends/${countryCode}/${key}`), null);
               console.log(`Eski veri silindi: ${key} (${countryCode})`);
+              dataWasDeleted = true;
             }
           } catch (itemError) {
             console.error(`Veri temizleme hatası (${key}):`, itemError);
@@ -247,6 +256,11 @@ export class FirebaseTrendStore {
             continue;
           }
         }
+      }
+      
+      // Eğer veri silindiyse, son güncelleme zamanını güncelle
+      if (dataWasDeleted) {
+        this.lastUpdated = new Date();
       }
       
       console.log('Veri temizleme tamamlandı:', new Date().toISOString());
@@ -260,6 +274,40 @@ export class FirebaseTrendStore {
     const instance = FirebaseTrendStore.getInstance();
     console.log('Manuel temizleme tetiklendi:', new Date().toISOString());
     instance.cleanupExpiredData();
+  }
+
+  // Tüm trend verilerini sıfırla (5 saatlik reset için)
+  public async resetAllTrends(): Promise<void> {
+    try {
+      // SSR ortamı kontrolü
+      if (typeof window === 'undefined') {
+        console.warn('SSR ortamında Firebase işlemleri gerçekleştirilmiyor');
+        return;
+      }
+      
+      console.log('Tüm trend verileri sıfırlanıyor:', new Date().toISOString());
+      
+      // Tüm ülke kodları için döngü
+      for (const countryCode of COUNTRY_CODES) {
+        // Ülkeye ait trend yolunu al
+        const trendsRef = ref(db, `trends/${countryCode}`);
+        
+        // Tüm verileri null olarak ayarla - Firebase'de silme işlemi
+        await set(trendsRef, null);
+        console.log(`${countryCode} ülkesi için trend verileri sıfırlandı.`);
+      }
+      
+      // Son güncelleme zamanını yenile
+      this.lastUpdated = new Date();
+      console.log('Tüm trend verileri başarıyla sıfırlandı!');
+    } catch (error) {
+      console.error('Trend verileri sıfırlanırken hata:', error);
+    }
+  }
+  
+  // Son güncelleme zamanını getir
+  public getLastUpdatedTime(): Date {
+    return this.lastUpdated;
   }
 }
 
