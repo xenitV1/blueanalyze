@@ -3,12 +3,12 @@ const admin = require('firebase-admin');
 admin.initializeApp();
 
 /**
- * Her 24 saatte bir çalışan ve 24 saatten eski trend verilerini temizleyen zamanlı görev.
- * Bu görev PubSub tetikleyicisi ile çalışır ve her gün aynı saatte otomatik olarak çalıştırılır.
+ * Her 5 saatte bir çalışan ve 5 saatten eski trend verilerini temizleyen zamanlı görev.
+ * Bu görev PubSub tetikleyicisi ile çalışır ve her 5 saatte bir otomatik olarak çalıştırılır.
  */
-exports.dailyCleanupTrends = functions.pubsub.schedule('every 24 hours').onRun(async (context) => {
+exports.dailyCleanupTrends = functions.pubsub.schedule('every 5 hours').onRun(async (context) => {
   const now = new Date().getTime();
-  const expiryTime = 24 * 60 * 60 * 1000; // 24 saat (milisaniye cinsinden)
+  const expiryTime = 5 * 60 * 60 * 1000; // 5 saat (milisaniye cinsinden)
   
   console.log('Zamanlı veri temizleme görevi başladı:', new Date().toISOString());
   
@@ -45,7 +45,7 @@ exports.dailyCleanupTrends = functions.pubsub.schedule('every 24 hours').onRun(a
           return;
         }
         
-        // 24 saatten eski verileri sil
+        // 5 saatten eski verileri sil
         const updatedAt = new Date(trendData.updatedAt).getTime();
         if (now - updatedAt > expiryTime) {
           updates[`trends/${countryCode}/${tagKey}`] = null;

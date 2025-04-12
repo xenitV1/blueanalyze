@@ -9,6 +9,7 @@ import type { Trend, Country } from '../services/trendingAPI';
 import type { Route } from "./+types/trends";
 import StatusIndicator from '../components/trends/StatusIndicator';
 import { useLanguage } from '../contexts/LanguageContext';
+import { FirebaseTrendStore } from '../services/firebaseTrendStore';
 
 // Translation object for the trends page
 const translations = {
@@ -112,6 +113,18 @@ export default function TrendsPage() {
       clearInterval(statusInterval);
     };
   }, [checkConnectionStatus]);
+
+  // Sayfa yüklendiğinde temizleme işlemini tetikle
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        // Her 5 saatte bir veri temizleme
+        FirebaseTrendStore.triggerCleanupNow();
+      } catch (error) {
+        console.error('Trend temizleme hatası:', error);
+      }
+    }
+  }, []);
 
   const handleCountryChange = (countryCode: string) => {
     setSelectedCountry(countryCode);

@@ -3,8 +3,8 @@ import { ref, set, onValue, get, query, orderByChild, limitToLast } from 'fireba
 import { db } from './firebaseConfig';
 import type { Trend } from './trendingAPI';
 
-// TTL değeri - 24 saat (milisaniye cinsinden)
-const DATA_EXPIRY_TIME = 24 * 60 * 60 * 1000;
+// TTL değeri - 5 saat (milisaniye cinsinden)
+const DATA_EXPIRY_TIME = 5 * 60 * 60 * 1000;
 
 // Ülke kodları için sabit dizi (Circular dependency'yi önlemek için)
 const COUNTRY_CODES = ['global', 'TR', 'US', 'GB', 'DE', 'FR', 'JP', 'BR', 'IN', 'KR'];
@@ -43,11 +43,21 @@ export class FirebaseTrendStore {
     return FirebaseTrendStore.instance;
   }
 
-  // Constructor - sadece bir kez temizlik planla
+  // Constructor - temizlik işlemlerini daha sık yapacak şekilde düzenle
   constructor() {
     // Temizlik işlemini başlat (eğer zaten başlatılmamışsa)
     if (!this.scheduledCleanup && typeof window !== 'undefined') {
-      this.scheduledCleanup = this.startCleanupScheduler();
+      // Sayfa açılır açılmaz ilk temizliği yap
+      this.cleanupExpiredData().catch(err => {
+        console.error("İlk temizleme başarısız:", err);
+      });
+      
+      // Her 30 dakikada bir temizliği kontrol et (daha sık)
+      this.scheduledCleanup = setInterval(() => {
+        this.cleanupExpiredData().catch(err => {
+          console.error("Planlanmış temizleme başarısız:", err);
+        });
+      }, 30 * 60 * 1000); // 30 dakika
     }
   }
 
@@ -101,9 +111,15 @@ export class FirebaseTrendStore {
         set(trendRef, trendData)
           .then(() => {
             // Success
+            console.log(`"${cleanTag}" etiketi güncellendi, sayı: ${count}`);
           })
           .catch((error) => {
+            // Hata daha ayrıntılı bir şekilde işleniyor
             console.error(`"${cleanTag}" güncellenirken hata:`, error);
+            // Büyük hataları konsola yazdırmak yerine kullanıcıya daha anlamlı bir mesaj göster
+            if (error && error.code === 'PERMISSION_DENIED') {
+              console.warn(`Firebase izin hatası: Etiket "${cleanTag}" güncellenemedi. Firebase kurallarınızı kontrol edin.`);
+            }
           });
       }).catch((error) => {
         console.error(`"${cleanTag}" okunurken hata:`, error);
@@ -239,19 +255,11 @@ export class FirebaseTrendStore {
     }
   }
   
-  // Temizlik zamanlayıcısını başlat (günde bir kez çalıştır)
-  public startCleanupScheduler(): NodeJS.Timeout {
-    // İlk temizliği hemen yap
-    this.cleanupExpiredData().catch(err => {
-      console.error("İlk temizleme başarısız:", err);
-    });
-    
-    // Her 24 saatte bir temizlik işlemini tekrarla
-    return setInterval(() => {
-      this.cleanupExpiredData().catch(err => {
-        console.error("Planlanmış temizleme başarısız:", err);
-      });
-    }, 24 * 60 * 60 * 1000); // 24 saat
+  // Her sayfa ziyaretinde temizliği tetikleyen bir fonksiyon ekle
+  public static triggerCleanupNow(): void {
+    const instance = FirebaseTrendStore.getInstance();
+    console.log('Manuel temizleme tetiklendi:', new Date().toISOString());
+    instance.cleanupExpiredData();
   }
 }
 
