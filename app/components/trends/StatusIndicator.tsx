@@ -15,12 +15,14 @@ const StatusIndicator: React.FC<StatusIndicatorProps> = ({ status }) => {
       connecting: 'Connecting...',
       disconnected: 'Disconnected',
       error: 'Connection error',
+      maintenance: 'Maintenance Mode',
     },
     TR: {
       connected: 'Canlı veri akışı',
       connecting: 'Bağlanıyor...',
       disconnected: 'Bağlantı kesildi',
       error: 'Bağlantı hatası',
+      maintenance: 'Bakım Modu',
     }
   };
 
@@ -49,6 +51,12 @@ const StatusIndicator: React.FC<StatusIndicatorProps> = ({ status }) => {
       bgColor: 'bg-red-100 dark:bg-red-900',
       textColor: 'text-red-700 dark:text-red-300',
       dotColor: 'bg-red-500',
+    },
+    maintenance: {
+      text: statusText[language].maintenance,
+      bgColor: 'bg-purple-100 dark:bg-purple-900',
+      textColor: 'text-purple-700 dark:text-purple-300',
+      dotColor: 'bg-purple-500',
     },
   };
 

@@ -23,7 +23,9 @@ const translations = {
     refreshing: "Refreshing...",
     refresh: "Refresh",
     dataSource: "Data is collected through the Bluesky Firehose API.",
-    trends: "Trends"
+    trends: "Trends",
+    maintenanceTitle: "Under Maintenance",
+    maintenanceMessage: "The trends feature is currently under maintenance. We're working to improve this service and will be back soon. Thank you for your patience."
   },
   TR: {
     pageTitle: "Bluesky Trend Etiketler | BlueAnalyze",
@@ -35,7 +37,9 @@ const translations = {
     refreshing: "Yenileniyor...",
     refresh: "Yenile",
     dataSource: "Veriler Bluesky Firehose API'si üzerinden toplanmaktadır.",
-    trends: "Trendleri"
+    trends: "Trendleri",
+    maintenanceTitle: "Bakım Aşamasında",
+    maintenanceMessage: "Trend özelliği şu anda bakım aşamasındadır. Bu hizmeti iyileştirmek için çalışıyoruz ve en kısa sürede tekrar aktif olacak. Anlayışınız için teşekkür ederiz."
   }
 };
 
@@ -61,79 +65,71 @@ export default function TrendsPage() {
   const { language } = useLanguage();
   const t = translations[language];
   
-  const [selectedCountry, setSelectedCountry] = useState<string>('global');
-  const [trends, setTrends] = useState<Trend[]>([]);
-  const [status, setStatus] = useState<string>('connecting');
-  const [loading, setLoading] = useState<boolean>(true);
-  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  // Bakım modu aktif - eski state değişkenlerini ve API çağrılarını kaldırıyoruz
+  // const [selectedCountry, setSelectedCountry] = useState<string>('global');
+  // const [trends, setTrends] = useState<Trend[]>([]);
+  // const [status, setStatus] = useState<string>('connecting');
+  // const [loading, setLoading] = useState<boolean>(true);
+  // const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  // WebSocket bağlantı durumunu kontrol et
-  const checkConnectionStatus = useCallback(() => {
-    const newStatus = getConnectionStatus();
-    if (newStatus !== status) {
-      setStatus(newStatus);
-    }
-  }, [status]);
+  // API çağrıları devre dışı bırakıldı
+  // const checkConnectionStatus = useCallback(() => {
+  //   const newStatus = getConnectionStatus();
+  //   if (newStatus !== status) {
+  //     setStatus(newStatus);
+  //   }
+  // }, [status]);
 
-  // Trendleri getir
-  const fetchTrends = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await getTrendingHashtags(selectedCountry);
-      
-      if (!data || data.length === 0) {
-        setLoading(false);
-        return;
-      }
-      
-      setTrends(data);
-      setLastUpdate(new Date());
-      setLoading(false);
-    } catch (error) {
-      console.error('Trend verileri alınırken hata:', error);
-      setLoading(false);
-    }
-  }, [selectedCountry]);
+  // const fetchTrends = useCallback(async () => {
+  //   try {
+  //     setLoading(true);
+  //     const data = await getTrendingHashtags(selectedCountry);
+  //     
+  //     if (!data || data.length === 0) {
+  //       setLoading(false);
+  //       return;
+  //     }
+  //     
+  //     setTrends(data);
+  //     setLastUpdate(new Date());
+  //     setLoading(false);
+  //   } catch (error) {
+  //     console.error('Trend verileri alınırken hata:', error);
+  //     setLoading(false);
+  //   }
+  // }, [selectedCountry]);
 
-  // Ülke değiştiğinde trendleri getir
-  useEffect(() => {
-    fetchTrends();
-  }, [selectedCountry, fetchTrends]);
+  // useEffect(() => {
+  //   fetchTrends();
+  // }, [selectedCountry, fetchTrends]);
 
-  // Sayfa yüklendiğinde WebSocket istemcisini başlat
-  useEffect(() => {
-    // WebSocket bağlantısını başlat
-    initializeJetstreamClient();
-    
-    // Düzenli olarak bağlantı durumunu kontrol et
-    const statusInterval = setInterval(checkConnectionStatus, 3000);
-    
-    // Temizlik fonksiyonu
-    return () => {
-      clearInterval(statusInterval);
-    };
-  }, [checkConnectionStatus]);
+  // useEffect(() => {
+  //   initializeJetstreamClient();
+  //   
+  //   const statusInterval = setInterval(checkConnectionStatus, 3000);
+  //   
+  //   return () => {
+  //     clearInterval(statusInterval);
+  //   };
+  // }, [checkConnectionStatus]);
 
-  // Sayfa yüklendiğinde temizleme işlemini tetikle
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        // Her 5 saatte bir veri temizleme
-        FirebaseTrendStore.triggerCleanupNow();
-      } catch (error) {
-        console.error('Trend temizleme hatası:', error);
-      }
-    }
-  }, []);
+  // useEffect(() => {
+  //   if (typeof window !== 'undefined') {
+  //     try {
+  //       FirebaseTrendStore.triggerCleanupNow();
+  //     } catch (error) {
+  //       console.error('Trend temizleme hatası:', error);
+  //     }
+  //   }
+  // }, []);
 
-  const handleCountryChange = (countryCode: string) => {
-    setSelectedCountry(countryCode);
-  };
+  // const handleCountryChange = (countryCode: string) => {
+  //   setSelectedCountry(countryCode);
+  // };
 
-  // Manuel yenileme için fonksiyon
-  const handleRefresh = () => {
-    fetchTrends();
-  };
+  // const handleRefresh = () => {
+  //   fetchTrends();
+  // };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -156,36 +152,15 @@ export default function TrendsPage() {
               </p>
               
               <div className="flex items-center gap-2 mb-2 mt-2">
-                <StatusIndicator status={status} />
-                {lastUpdate && (
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {t.lastUpdate} {lastUpdate.toLocaleTimeString()}
-                  </span>
-                )}
+                <StatusIndicator status="maintenance" />
               </div>
             </div>
             
             <button 
-              onClick={handleRefresh} 
-              disabled={loading}
-              className="mt-4 md:mt-0 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              disabled={true}
+              className="mt-4 md:mt-0 px-4 py-2 bg-gray-400 text-white rounded-md cursor-not-allowed flex items-center gap-2"
             >
-              {loading ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  {t.refreshing}
-                </>
-              ) : (
-                <>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  {t.refresh}
-                </>
-              )}
+              {t.refreshing}
             </button>
           </div>
           
@@ -193,22 +168,29 @@ export default function TrendsPage() {
             {t.dataSource}
           </div>
           
+          {/* Bakım modu mesajı */}
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 mb-6">
-            <CountrySelector 
-              countries={COUNTRIES}
-              selectedCountry={selectedCountry}
-              onChange={handleCountryChange}
-            />
+            <div className="text-center py-10">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto mb-4 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
+                {t.maintenanceTitle}
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
+                {t.maintenanceMessage}
+              </p>
+            </div>
           </div>
           
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
             <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">
-              {COUNTRIES.find(c => c.code === selectedCountry)?.flag || '🌎'} {COUNTRIES.find(c => c.code === selectedCountry)?.name || 'Global'} {t.trends}
+              {COUNTRIES.find(c => c.code === 'global')?.flag || '🌎'} {COUNTRIES.find(c => c.code === 'global')?.name || 'Global'} {t.trends}
             </h2>
             
             <TrendsList 
-              trends={trends}
-              isLoading={loading}
+              trends={[]}
+              isLoading={false}
             />
           </div>
         </motion.div>
@@ -234,15 +216,7 @@ export default function TrendsPage() {
           },
           "mainEntity": {
             "@type": "ItemList",
-            "itemListElement": trends.slice(0, 10).map((trend, index) => ({
-              "@type": "ListItem",
-              "position": index + 1,
-              "item": {
-                "@type": "Thing",
-                "name": trend.tag,
-                "url": `https://bsky.app/search?q=${encodeURIComponent(trend.tag)}`
-              }
-            }))
+            "itemListElement": []
           }
         })
       }} />

@@ -67,6 +67,11 @@ export class FirebaseTrendStore {
 
   // Tag'i artır
   public incrementTag(tag: string, country: string = 'global'): void {
+    // MAINTENANCE MODE: İşlemleri devre dışı bırak
+    console.log('Bakım modu: Trend işlemleri geçici olarak devre dışı.');
+    return;
+    
+    /* Eski kod
     try {
       // SSR ortamı kontrolü
       if (typeof window === 'undefined') {
@@ -134,10 +139,16 @@ export class FirebaseTrendStore {
     } catch (error) {
       console.error(`Tag artırılırken hata (${tag}):`, error);
     }
+    */
   }
   
   // Trendleri getir
   public async getTrends(country: string = 'global', limit: number = 20): Promise<Trend[]> {
+    // MAINTENANCE MODE: Bakım modu aktif, boş trend listesi döndür
+    console.log('Bakım modu: Trend işlemleri geçici olarak devre dışı.');
+    return [];
+
+    /* Eski kod
     try {
       // SSR ortamı kontrolü
       if (typeof window === 'undefined') {
@@ -201,108 +212,117 @@ export class FirebaseTrendStore {
         .slice(0, limit);
       
       return sortedTrends;
-      
     } catch (error) {
-      console.error('Firebase trendleri getirilirken hata:', error);
+      console.error(`Trendler alınırken hata (${country}):`, error);
       return [];
     }
+    */
   }
-
-  // Eski verileri temizle - günlük olarak çalıştırılabilir
+  
+  // Temizlik işlemi - süresi dolmuş trendleri kaldır
   public async cleanupExpiredData(): Promise<void> {
+    // MAINTENANCE MODE: Temizlik işlemlerini devre dışı bırak
+    console.log('Bakım modu: Temizlik işlemleri geçici olarak devre dışı.');
+    return;
+    
+    /* Eski kod
     try {
       // SSR ortamı kontrolü
       if (typeof window === 'undefined') {
-        console.warn('SSR ortamında Firebase işlemleri gerçekleştirilmiyor');
         return;
       }
       
-      const now = new Date().getTime();
-      let dataWasDeleted = false;
+      console.log('Trend verilerini temizleme işlemi başlatılıyor...');
       
-      // Ülke kodlarını kullan (Circular dependency'den kaçınmak için)
-      for (const countryCode of COUNTRY_CODES) {
-        const trendsRef = ref(db, `trends/${countryCode}`);
-        
-        // Verileri oku
+      // Her ülke için temizleme işlemi yap
+      for (const country of COUNTRY_CODES) {
+        // Ülke trendlerini al
+        const trendsRef = ref(db, `trends/${country}`);
         const snapshot = await get(trendsRef);
         
         if (!snapshot.exists()) {
-          continue;
+          continue; // Bu ülke için veri yoksa devam et
         }
         
-        // Tüm trend verileri
         const trendsData = snapshot.val();
         
-        // Her bir trendi kontrol et ve eski ise sil
+        // Her trend için süre kontrolü yap
         for (const key in trendsData) {
           try {
             const trendData = trendsData[key];
             
-            // Geçersiz veri kontrolü
-            if (!trendData || !trendData.updatedAt) continue;
-            
-            const updatedAt = new Date(trendData.updatedAt).getTime();
-            
-            if (now - updatedAt > DATA_EXPIRY_TIME) {
-              // Süre dolmuş veriyi sil
-              await set(ref(db, `trends/${countryCode}/${key}`), null);
-              console.log(`Eski veri silindi: ${key} (${countryCode})`);
-              dataWasDeleted = true;
+            // Veri yok veya güncelleme tarihi yok ise sil
+            if (!trendData || !trendData.updatedAt) {
+              console.log(`Eski veri silindi: ${key} (${country})`);
+              await set(ref(db, `trends/${country}/${key}`), null);
+              continue;
             }
-          } catch (itemError) {
-            console.error(`Veri temizleme hatası (${key}):`, itemError);
-            // Tek bir itemdeki hata tüm işlemi durdurmaz
-            continue;
+            
+            // Süresi dolmuş ise sil
+            const updatedAt = new Date(trendData.updatedAt);
+            const now = new Date();
+            if (now.getTime() - updatedAt.getTime() > DATA_EXPIRY_TIME) {
+              console.log(`Eski veri silindi: ${key} (${country})`);
+              await set(ref(db, `trends/${country}/${key}`), null);
+            }
+          } catch (error) {
+            console.error(`Trend temizleme hatası (${key}, ${country}):`, error);
           }
         }
       }
       
-      // Eğer veri silindiyse, son güncelleme zamanını güncelle
-      if (dataWasDeleted) {
-        this.lastUpdated = new Date();
-      }
-      
-      console.log('Veri temizleme tamamlandı:', new Date().toISOString());
+      console.log('Trend verileri temizleme işlemi tamamlandı.');
     } catch (error) {
-      console.error('Veri temizleme sırasında hata:', error);
+      console.error(`Trendler temizlenirken genel hata:`, error);
     }
+    */
   }
   
-  // Her sayfa ziyaretinde temizliği tetikleyen bir fonksiyon ekle
+  // Statik temizlik fonksiyonu
   public static triggerCleanupNow(): void {
+    // MAINTENANCE MODE: Temizlik tetiklemeyi devre dışı bırak
+    console.log('Bakım modu: Temizlik tetikleme işlemi geçici olarak devre dışı.');
+    return;
+    
+    /* Eski kod
     const instance = FirebaseTrendStore.getInstance();
-    console.log('Manuel temizleme tetiklendi:', new Date().toISOString());
-    instance.cleanupExpiredData();
+    instance.cleanupExpiredData().catch(err => {
+      console.error("Manuel temizleme hatası:", err);
+    });
+    */
   }
-
-  // Tüm trend verilerini sıfırla (5 saatlik reset için)
+  
+  // Tüm trend verilerini sıfırla (tehlikeli!)
   public async resetAllTrends(): Promise<void> {
+    // MAINTENANCE MODE: Sıfırlama işlemlerini devre dışı bırak
+    console.log('Bakım modu: Sıfırlama işlemleri geçici olarak devre dışı.');
+    return;
+    
+    /* Eski kod
     try {
       // SSR ortamı kontrolü
       if (typeof window === 'undefined') {
-        console.warn('SSR ortamında Firebase işlemleri gerçekleştirilmiyor');
         return;
       }
       
-      console.log('Tüm trend verileri sıfırlanıyor:', new Date().toISOString());
+      // Güvenlik için onay gerektiren tehlikeli bir işlem
+      console.warn('⚠️ TÜM TREND VERİLERİ SİLİNECEK! Bu işlem geri alınamaz!');
       
-      // Tüm ülke kodları için döngü
-      for (const countryCode of COUNTRY_CODES) {
-        // Ülkeye ait trend yolunu al
-        const trendsRef = ref(db, `trends/${countryCode}`);
-        
-        // Tüm verileri null olarak ayarla - Firebase'de silme işlemi
-        await set(trendsRef, null);
-        console.log(`${countryCode} ülkesi için trend verileri sıfırlandı.`);
+      // Tüm ülke trend verilerini sıfırla
+      for (const country of COUNTRY_CODES) {
+        try {
+          await set(ref(db, `trends/${country}`), null);
+          console.log(`${country} trend verileri sıfırlandı.`);
+        } catch (error) {
+          console.error(`${country} trend verileri sıfırlanırken hata:`, error);
+        }
       }
       
-      // Son güncelleme zamanını yenile
-      this.lastUpdated = new Date();
-      console.log('Tüm trend verileri başarıyla sıfırlandı!');
+      console.log('Tüm trend verileri başarıyla sıfırlandı.');
     } catch (error) {
-      console.error('Trend verileri sıfırlanırken hata:', error);
+      console.error('Trend verileri sıfırlanırken genel hata:', error);
     }
+    */
   }
   
   // Son güncelleme zamanını getir
@@ -311,7 +331,7 @@ export class FirebaseTrendStore {
   }
 }
 
-// Firebase Trend Store singleton instance'ını döndürür
+// FirebaseTrendStore singleton'ını getir
 export function getFirebaseTrendStore(): FirebaseTrendStore {
   return FirebaseTrendStore.getInstance();
 }
@@ -320,7 +340,8 @@ export function getFirebaseTrendStore(): FirebaseTrendStore {
 if (typeof window !== 'undefined') {
   // Sayfanın yüklenmesi tamamlandığında işlemleri başlat
   window.addEventListener('load', () => {
-    console.log('Firebase trend izleme başlatıldı');
-    getFirebaseTrendStore(); // Singleton instance'ı oluştur ve temizlik zamanlayıcısını başlat
+    // MAINTENANCE MODE: Firebase trend izleme devre dışı
+    console.log('Bakım modu: Firebase trend izleme başlatılmadı');
+    // getFirebaseTrendStore(); // Singleton instance'ı oluşturma
   });
 } 

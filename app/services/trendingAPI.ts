@@ -247,9 +247,9 @@ class TrendStore {
       }
       
       // Firebase kullanılıyorsa, Firebase verilerini de temizle
-      if (USE_FIREBASE && firebaseTrendStore) {
+      if (USE_FIREBASE && getFirebaseTrendStore()) {
         try {
-          firebaseTrendStore.resetAllTrends();
+          getFirebaseTrendStore().resetAllTrends();
         } catch (error) {
           console.error('Firebase trend verileri temizlenirken hata:', error);
         }
@@ -635,7 +635,7 @@ class JetstreamClient {
     const countryCode = this.getCountryCodeFromLangs(langs);
     
     // USE_FIREBASE true ise Firebase'e kaydet
-    if (USE_FIREBASE && firebaseTrendStore) {
+    if (USE_FIREBASE && getFirebaseTrendStore()) {
       // Her hashtag için
       hashtags.forEach(hashtag => {
         try {
@@ -652,11 +652,11 @@ class JetstreamClient {
           }
           
           // Firebase trend deposuna kaydet
-          firebaseTrendStore.incrementTag(cleanedHashtag, countryCode);
+          getFirebaseTrendStore().incrementTag(cleanedHashtag, countryCode);
           
           // Global olarak da artır (eğer ülke kodu zaten global değilse)
           if (countryCode !== 'global') {
-            firebaseTrendStore.incrementTag(cleanedHashtag, 'global');
+            getFirebaseTrendStore().incrementTag(cleanedHashtag, 'global');
           }
         } catch (error) {
           console.error(`Hashtag işlenirken hata: ${hashtag}`, error);
@@ -730,6 +730,12 @@ let jetstreamClient: JetstreamClient | null = null;
 
 // Jetstream bağlantısını başlat
 export function initializeJetstreamClient() {
+  // MAINTENANCE MODE: Tüm bağlantılar devre dışı bırakıldı
+  console.log('Trend servisi bakım modunda.');
+  return null;
+  
+  // Eski kod yorum satırına alındı
+  /*
   if (!jetstreamClient) {
     jetstreamClient = new JetstreamClient();
   } else if (jetstreamClient.getStatus() !== 'connected') {
@@ -738,44 +744,66 @@ export function initializeJetstreamClient() {
   }
   
   return jetstreamClient;
+  */
 }
 
 // Belirli bir ülke için trend etiketlerini getir
 export async function getTrendingHashtags(country: string = 'global', limit: number = 20): Promise<Trend[]> {
+  // MAINTENANCE MODE: Trend verileri devre dışı
+  console.log('Trend servisi bakım modunda, veri alamıyor.');
+  return [];
+  
+  // Eski kod yorum satırına alındı
+  /*
   // Eğer Jetstream istemcisi başlatılmamışsa başlat
   if (!jetstreamClient) {
     initializeJetstreamClient();
   }
   
   // Firebase kullanılıyorsa, Firebase'den al
-  if (USE_FIREBASE && firebaseTrendStore) {
-    return await firebaseTrendStore.getTrends(country, limit);
+  if (USE_FIREBASE && getFirebaseTrendStore()) {
+    return await getFirebaseTrendStore().getTrends(country, limit);
   } 
   
   // Aksi takdirde yerel depodan al
   return trendStore.getTrends(country, limit);
+  */
 }
 
 // WebSocket bağlantı durumunu getir
 export function getConnectionStatus(): ConnectionStatus {
+  // MAINTENANCE MODE: Bakım modu durumu
+  return 'disconnected';
+  
+  // Eski kod yorum satırına alındı
+  /*
   if (!jetstreamClient) {
     return 'disconnected';
   }
   
   return jetstreamClient.getStatus();
+  */
 }
 
 // Trend verilerinin son güncellenme zamanını getir
 export function getLastUpdatedTime(): Date {
+  // MAINTENANCE MODE: Sabit bir tarih döndür
+  return new Date();
+  
+  // Eski kod yorum satırına alındı
+  /*
   // Firebase kullanılıyorsa Firebase'den, yoksa local trendStore'dan son güncelleme zamanını getir
-  if (USE_FIREBASE && firebaseTrendStore) {
-    return firebaseTrendStore.getLastUpdatedTime();
+  if (USE_FIREBASE && getFirebaseTrendStore()) {
+    return getFirebaseTrendStore().getLastUpdatedTime();
   }
   
   return trendStore.getLastUpdatedTime();
+  */
 }
 
 // Eğer bu modül bir tarayıcı ortamında çalışıyorsa, otomatik başlat
 if (typeof window !== 'undefined') {
-  initializeJetstreamClient();
+  // MAINTENANCE MODE: Otomatik başlatma devre dışı
+  console.log('Trend servisi bakım modunda, otomatik başlatma devre dışı.');
+  // initializeJetstreamClient();
 } 
