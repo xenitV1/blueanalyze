@@ -14,10 +14,6 @@ BlueAnalyze is a comprehensive follower analysis tool developed for Bluesky user
 - **Target-Based Following**: Follow a specific user's followers or following in bulk
 - **Session Management**: Secure login using App Password and token management
 - **Multilingual Support**: English and Turkish language support
-- **Real-Time Tag Trends**: Track popular tag trends in real-time
-- **Country Filtering**: Filter followers and following by country
-- **Centralized Data Collection**: Collect data centrally using Firebase
-- **Automated Data Cleanup**: Automatically clean data using Cloud Functions
 
 ## 📋 Data Schema
 
@@ -150,65 +146,5 @@ For questions or suggestions, you can reach out via [GitHub Issues](https://gith
 ---
 
 🔹 BlueAnalyze is an unofficial tool and not directly affiliated with Bluesky Social.
-
-## 🔥 Firebase Configuration
-
-1. **Clone the repository**
-```bash
-git clone https://github.com/YOUR-USERNAME/blueanalyze.git
-cd blueanalyze
-```
-
-2. **Install required dependencies**
-```bash
-npm install
-```
-
-3. **Firebase configuration**
-   - Copy the `app/services/firebaseConfig.example.ts` file to `app/services/firebaseConfig.ts`
-   - Enter the actual configuration values from your Firebase console
-
-```typescript
-// Replace these values with your Firebase project information
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.REGION.firebasedatabase.app",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID",
-  measurementId: "YOUR_MEASUREMENT_ID"
-};
-```
-
-4. **Start the application in development mode**
-```bash
-npm run dev
-```
-
-## 🔥 Firebase Functions Setup
-
-Setup Cloud Functions for automatic data cleaning every 24 hours:
-
-1. **Install Firebase CLI** (if not already installed)
-```bash
-npm install -g firebase-tools
-```
-
-2. **Log in to your Firebase account**
-```bash
-firebase login
-```
-
-3. **Deploy Functions**
-```bash
-firebase deploy --only functions
-```
-
-## 🔥 Notes
-
-- The `firebaseConfig.ts` file is added to .gitignore for security reasons. Remember to add your own Firebase configuration when forking this project.
-- Database rules are open for testing purposes. Stricter rules should be used in a production environment.
 
 Built with Cursor. Thanks to the Cursor team
