@@ -13,7 +13,6 @@ export interface Translations {
   changeLanguage: string;
   clearCache: string;  // Önbelleği Temizle çevirisi
   cacheCleared: string; // Temizlendi çevirisi
-  trends: string;      // Trendler çevirisi
   
   // Follower Analysis
   appTitle: string;
@@ -108,7 +107,6 @@ const enTranslations: Translations = {
   changeLanguage: 'Change language',
   clearCache: 'Clear Cache',
   cacheCleared: 'Cleared!',
-  trends: 'Trends',
   
   // Follower Analysis
   appTitle: 'BlueAnalyze - Bluesky Analytics Tool',
@@ -203,7 +201,6 @@ const trTranslations: Translations = {
   changeLanguage: 'Dili değiştir',
   clearCache: 'Önbelleği Temizle',
   cacheCleared: 'Temizlendi!',
-  trends: 'Trendler',
   
   // Follower Analysis
   appTitle: 'BlueAnalyze - Bluesky Analiz Aracı',

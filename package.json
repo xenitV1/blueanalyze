@@ -16,7 +16,6 @@
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "express": "^5.1.0",
-    "firebase": "^11.6.0",
     "framer-motion": "^12.6.3",
     "isbot": "^5.1.17",
     "react": "^19.0.0",

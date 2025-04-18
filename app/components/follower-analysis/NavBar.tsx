@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FiGlobe, FiLoader, FiActivity, FiGithub, FiHash, FiTrash } from 'react-icons/fi';
+import { FiGlobe, FiLoader, FiActivity, FiGithub, FiTrash } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useOperation } from '../../contexts/OperationContext';
@@ -12,7 +12,6 @@ const NavBar: React.FC = () => {
   
   // Geçerli sayfayı kontrol et
   const isHomePage = window.location.pathname === '/';
-  const isTrendsPage = window.location.pathname === '/trends';
 
   // İşlem aktif mi kontrol et
   const isActiveOperation = operation.type !== 'none' && operation.isProcessing;
@@ -73,21 +72,6 @@ const NavBar: React.FC = () => {
           </div>
           
           <div className="flex items-center space-x-4">
-            {/* Ana sayfa ve Trendler sayfası bağlantıları */}
-            <div className="hidden md:flex space-x-2 mr-2">
-              <a
-                href="/trends"
-                className={`px-3 py-1 rounded-full transition-colors flex items-center ${
-                  isTrendsPage
-                    ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
-                    : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-                }`}
-              >
-                <FiHash className="h-4 w-4 mr-1" />
-                {t.trends}
-              </a>
-            </div>
-            
             {/* Aktif işlem bilgisi - Varsa göster */}
             {isActiveOperation && (
               <div className="flex items-center text-xs md:text-sm px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300">

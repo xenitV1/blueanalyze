@@ -4,16 +4,11 @@
   status = 200
 
 [build]
-  # Önce Firebase yapılandırma dosyasını oluştur, sonra build yap
-  command = "mkdir -p app/services && echo \"// Firebase yapılandırma dosyası\nimport { initializeApp } from 'firebase/app';\nimport { getDatabase } from 'firebase/database';\nimport { getAnalytics } from 'firebase/analytics';\n\n// Firebase yapılandırma detayları\nconst firebaseConfig = {\n  apiKey: '${FIREBASE_API_KEY}',\n  authDomain: '${FIREBASE_AUTH_DOMAIN}',\n  databaseURL: '${FIREBASE_DATABASE_URL}',\n  projectId: '${FIREBASE_PROJECT_ID}',\n  storageBucket: '${FIREBASE_STORAGE_BUCKET}',\n  messagingSenderId: '${FIREBASE_MESSAGING_SENDER_ID}',\n  appId: '${FIREBASE_APP_ID}',\n  measurementId: '${FIREBASE_MEASUREMENT_ID}'\n};\n\n// Firebase uygulamasını başlat\nconst app = initializeApp(firebaseConfig);\n\n// Realtime Database referansını al\nexport const db = getDatabase(app);\n\n// Analytics'i sadece tarayıcı ortamında başlat\nlet analytics = null;\nif (typeof window !== 'undefined') {\n  analytics = getAnalytics(app);\n}\n\n// Firebase bağlantısı için yardımcı fonksiyonlar\nexport function getFirebaseDatabase() {\n  return db;\n}\n\n// Bu dosyayı import eden Netlify Functions veya diğer servisler için\nexport default {\n  app,\n  db,\n  analytics,\n  getFirebaseDatabase,\n};\" > app/services/firebaseConfig.ts && ls -la app/services/ && npm run build"
+  command = "npm run build"
   publish = "build/client"
 
 [build.environment]
   NODE_VERSION = "20"
-  # Güvenlik taramasını ayarlıyoruz
-  SECRETS_SCAN_ENABLED = "false"
-  # Alternatif olarak, belirli dosyaları tarama dışı bırakabiliriz
-  SECRETS_SCAN_OMIT_PATHS = ".firebaserc"
 
 [build.processing]
   skip_processing = false
@@ -31,11 +26,6 @@
 
 [build.processing.images]
   compress = true
-
-# Firebase SSR için webpack yapılandırması
-[functions]
-  node_bundler = "esbuild"
-  external_node_modules = ["firebase", "firebase-admin", "firebase/app", "firebase/database"]
 
 [dev]
   command = "npm run dev"
