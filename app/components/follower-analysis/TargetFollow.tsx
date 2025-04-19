@@ -622,8 +622,7 @@ const TargetFollow: React.FC = () => {
               setTimeoutStatus(true, 60); // 60 saniye bekle
             }
           }
-        },
-        abortControllerRef.current.signal // Pass the AbortSignal to the function
+        }
       );
       
       console.log('Target follow batch operation completed:', result);

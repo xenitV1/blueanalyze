@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { BlueSkyUser, FollowerAnalysisResult, DebugInfo, ProgressInfo } from '../../services/blueskyAPI';
-import { analyzeFollowers, batchUnfollowUsers, batchUnfollowUsersWithProgress, batchFollowUsers, batchFollowUsersWithProgress, getAllFollowers, getAllFollowing, getOperationProgress, clearOperationProgress, authenticateUser, saveSession, getSession, validateSession, clearSession, searchUsers, analyzeFollowersWithProgress, invalidateAnalysisCache } from '../../services/blueskyAPI';
+import type { BlueSkyUser, FollowerAnalysisResult, DebugInfo } from '../../services/blueskyAPI';
+import { analyzeFollowers, batchUnfollowUsers, batchUnfollowUsersWithProgress, batchFollowUsers, batchFollowUsersWithProgress, getAllFollowers, getAllFollowing, getOperationProgress, clearOperationProgress, authenticateUser, saveSession, getSession, validateSession, clearSession, searchUsers, invalidateAnalysisCache, analyzeFollowersProgressive } from '../../services/blueskyAPI';
 import { useOperation } from '../../contexts/OperationContext';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
@@ -13,6 +13,13 @@ import TargetFollow from './TargetFollow';
 import UnfollowAll from './UnfollowAll';
 import { getLastUsername, saveLastUsername, getAnalysisResults, clearAnalysisResults } from '../../services/indexedDBService';
 import * as idb from '../../services/indexedDBService';
+
+// Define ProgressInfo interface locally as it doesn't exist in blueskyAPI
+interface ProgressInfo {
+  followersProgress: { fetched: number, total: number };
+  followingProgress: { fetched: number, total: number };
+  analysisProgress: number;
+}
 
 const FollowerAnalysis: React.FC = () => {
   const { operation, togglePause } = useOperation();
@@ -252,12 +259,30 @@ const FollowerAnalysis: React.FC = () => {
       }
 
       // Use the parallel fetching function with progress callback and caching
-      const analysisResult = await analyzeFollowersWithProgress(
+      const analysisResponse = await analyzeFollowersProgressive(
         formattedUsername,
-        (progress) => {
-          setFetchProgress(progress);
+        {
+          onProgress: (progress) => {
+            setFetchProgress({
+              followersProgress: { 
+                fetched: progress.loadedFollowers, 
+                total: progress.totalFollowersEstimate 
+              },
+              followingProgress: { 
+                fetched: progress.loadedFollowing, 
+                total: progress.totalFollowingEstimate 
+              },
+              analysisProgress: progress.isComplete ? 100 : Math.round(
+                ((progress.loadedFollowers / Math.max(1, progress.totalFollowersEstimate)) + 
+                (progress.loadedFollowing / Math.max(1, progress.totalFollowingEstimate))) * 50
+              )
+            });
+          }
         }
       );
+      
+      // Extract the result from the response
+      const analysisResult = analysisResponse.result;
       
       // Check if data was from cache
       if (fetchProgress.analysisProgress === 100 && fetchProgress.followersProgress.fetched > 0) {
@@ -307,7 +332,7 @@ const FollowerAnalysis: React.FC = () => {
       await invalidateAnalysisCache(username);
       
       // Then force a fresh analysis
-      const analysisResult = await analyzeFollowers(username, { forceRefresh: true });
+      const analysisResult = await analyzeFollowers(username);
       setFollowersData(analysisResult);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to refresh data');
@@ -433,7 +458,7 @@ const FollowerAnalysis: React.FC = () => {
         await invalidateAnalysisCache(username);
         
         // Analizi yenile - API'dan en son verileri al
-        const newAnalysis = await analyzeFollowers(username, { forceRefresh: true });
+        const newAnalysis = await analyzeFollowers(username);
         setFollowersData(newAnalysis);
       }
     } catch (err: any) {
@@ -528,7 +553,7 @@ const FollowerAnalysis: React.FC = () => {
         await invalidateAnalysisCache(username);
         
         // Analizi yenile - API'dan en son verileri al
-        const newAnalysis = await analyzeFollowers(username, { forceRefresh: true });
+        const newAnalysis = await analyzeFollowers(username);
         setFollowersData(newAnalysis);
       }
     } catch (err) {
