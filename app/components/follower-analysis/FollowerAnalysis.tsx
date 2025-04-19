@@ -131,20 +131,29 @@ const FollowerAnalysis: React.FC = () => {
         if (session) {
           // Oturum geçerli olduğunda direkt olarak login formunu gizle
           setShowLoginForm(false);
-          
           setUsername(session.username);
-          setIsLoading(true);
-          try {
-            // Kaydedilmiş oturum ile takipçi analizini yükle
-            console.log("Loading analysis with saved session...");
-            const analysisResult = await analyzeFollowers(session.username);
-            setFollowersData(analysisResult);
-            console.log("Analysis loaded successfully with saved session");
-          } catch (err) {
-            console.error("Failed to load analysis with saved session:", err);
-            setError(err instanceof Error ? err.message : 'Failed to load saved session data');
-          } finally {
-            setIsLoading(false);
+          
+          // Check if we're coming directly from login - if so, don't auto-analyze
+          const isNewLogin = sessionStorage.getItem('freshLogin') === 'true';
+          
+          if (!isNewLogin) {
+            // Only run analysis if not coming from a fresh login
+            setIsLoading(true);
+            try {
+              // Kaydedilmiş oturum ile takipçi analizini yükle
+              console.log("Loading analysis with saved session...");
+              const analysisResult = await analyzeFollowers(session.username);
+              setFollowersData(analysisResult);
+              console.log("Analysis loaded successfully with saved session");
+            } catch (err) {
+              console.error("Failed to load analysis with saved session:", err);
+              setError(err instanceof Error ? err.message : 'Failed to load saved session data');
+            } finally {
+              setIsLoading(false);
+            }
+          } else {
+            // Clear the freshLogin flag
+            sessionStorage.removeItem('freshLogin');
           }
         }
       }
@@ -253,6 +262,9 @@ const FollowerAnalysis: React.FC = () => {
           });
           
           saveSession(formattedUsername, authResponse);
+          
+          // Set freshLogin flag in sessionStorage
+          sessionStorage.setItem('freshLogin', 'true');
         } catch (authError) {
           console.error('Authentication error:', authError);
         }
