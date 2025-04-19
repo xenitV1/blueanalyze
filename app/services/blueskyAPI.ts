@@ -2717,3 +2717,28 @@ export const unfollowUser = async (
   debugInfo.message = `Failed to unfollow user after ${MAX_RETRIES} retries`;
   return { success: false, debug: debugInfo };
 };
+
+/**
+ * Analiz önbelleğini temizler ve yeni bir analiz yapılmasını sağlar
+ */
+export const invalidateAnalysisCache = (handle: string): void => {
+  try {
+    // Önbellek anahtarlarını temizle
+    localStorage.removeItem(`blueAnalyze_followers_${handle}`);
+    localStorage.removeItem(`blueAnalyze_following_${handle}`);
+    
+    // ApiCache içindeki analiz ile ilgili tüm verileri temizle
+    if (apiCache) {
+      const cacheKeys = apiCache.keys();
+      cacheKeys.forEach(key => {
+        if (key.includes(handle) || key.includes('analysis')) {
+          apiCache.delete(key);
+        }
+      });
+    }
+    
+    console.log(`Analysis cache for ${handle} has been invalidated`);
+  } catch (error) {
+    console.error('Error invalidating analysis cache:', error);
+  }
+};
