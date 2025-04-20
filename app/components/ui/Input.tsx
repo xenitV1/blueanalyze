@@ -26,6 +26,8 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     const [showAtWarning, setShowAtWarning] = useState(false);
     const [visualValue, setVisualValue] = useState('');
     const [actualValue, setActualValue] = useState('');
+    const inputRef = React.useRef<HTMLInputElement | null>(null);
+    const [selectionStart, setSelectionStart] = useState<number | null>(null);
     
     useEffect(() => {
       if (isBlueskyUsername && props.value) {
@@ -33,7 +35,8 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         setActualValue(val);
         
         if (val.includes('.bsky.social')) {
-          setVisualValue(val);
+          const username = val.split('.bsky.social')[0];
+          setVisualValue(username);
         } else {
           setVisualValue(val);
         }
@@ -41,7 +44,8 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     }, [props.value, isBlueskyUsername]);
     
     const handleBlueskyUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      let newValue = e.target.value.trim();
+      const cursorPosition = e.target.selectionStart;
+      let newValue = e.target.value;
       
       if (newValue.startsWith('@')) {
         newValue = newValue.substring(1);
@@ -50,12 +54,12 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         setShowAtWarning(false);
       }
       
-      const baseName = newValue.split('.')[0];
-      
       setVisualValue(newValue);
       
-      const fullHandle = baseName ? `${baseName}.bsky.social` : newValue;
+      const fullHandle = newValue ? `${newValue}.bsky.social` : newValue;
       setActualValue(fullHandle);
+      
+      setSelectionStart(cursorPosition);
       
       if (props.onChange) {
         const syntheticEvent = {
@@ -69,6 +73,14 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         props.onChange(syntheticEvent);
       }
     };
+    
+    useEffect(() => {
+      if (selectionStart !== null && inputRef.current) {
+        inputRef.current.selectionStart = selectionStart;
+        inputRef.current.selectionEnd = selectionStart;
+        setSelectionStart(null);
+      }
+    }, [selectionStart, visualValue]);
     
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (isBlueskyUsername) {
@@ -90,7 +102,6 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
       if (isBlueskyUsername && visualValue && !visualValue.includes('.')) {
         const fullHandle = `${visualValue}.bsky.social`;
-        setVisualValue(fullHandle);
         setActualValue(fullHandle);
         
         if (props.onChange) {
@@ -139,7 +150,14 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           </label>
         )}
         <input
-          ref={ref}
+          ref={(node) => {
+            if (typeof ref === 'function') {
+              ref(node);
+            } else if (ref) {
+              ref.current = node;
+            }
+            inputRef.current = node;
+          }}
           className={inputClasses}
           {...props}
           value={isBlueskyUsername ? visualValue : props.value}
