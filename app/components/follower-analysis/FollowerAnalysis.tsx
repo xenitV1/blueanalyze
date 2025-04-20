@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { BlueSkyUser, FollowerAnalysisResult, DebugInfo } from '../../services/blueskyAPI';
-import { analyzeFollowers, batchUnfollowUsers, batchUnfollowUsersWithProgress, batchFollowUsers, batchFollowUsersWithProgress, getAllFollowers, getAllFollowing, getOperationProgress, clearOperationProgress, authenticateUser, saveSession, getSession, validateSession, clearSession, searchUsers, invalidateAnalysisCache, analyzeFollowersProgressive } from '../../services/blueskyAPI';
+import type { BlueSkyUser, FollowerAnalysisResult, DebugInfo, AuthResponse } from '../../services/blueskyAPI';
+import { analyzeFollowers, batchUnfollowUsers, batchUnfollowUsersWithProgress, batchFollowUsers, batchFollowUsersWithProgress, getAllFollowers, getAllFollowing, getOperationProgress, clearOperationProgress, authenticateUser, saveSession, getSession, validateSession, clearSession, searchUsers, invalidateAnalysisCache, analyzeFollowersProgressive, analyzeFollowersData, cacheFollowersData, cacheFollowingData } from '../../services/blueskyAPI';
 import { useOperation } from '../../contexts/OperationContext';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
@@ -110,56 +110,89 @@ const FollowerAnalysis: React.FC = () => {
   useEffect(() => {
     const checkSession = async () => {
       console.log("Checking session validity...");
-      const validSession = await validateSession();
-      console.log("Session validation result:", validSession ? "Valid session found" : "No valid session");
-      
-      if (validSession) {
-        // Oturum geçerliyse kaydedilmiş kullanıcı adını al
-        const session = await getSession();
-        console.log("Retrieved session data:", session);
+      try {
+        const validSession = await validateSession();
+        console.log("Session validation result:", validSession ? "Valid session found" : "No valid session");
         
-        // Debug bilgisi için session bilgilerini kaydet
-        if (session) {
-          setSessionDebugInfo({
-            username: session.username,
-            tokenExpiry: session.tokenExpiry ? new Date(session.tokenExpiry).toLocaleString() : "N/A",
-            timeRemaining: session.tokenExpiry ? Math.round((session.tokenExpiry - Date.now()) / 1000 / 60) + " minutes" : "N/A",
-            didFormat: session.did ? `${session.did.substring(0, 10)}...${session.did.substring(session.did.length - 5)}` : "N/A"
-          });
-        }
-        
-        if (session) {
-          // Oturum geçerli olduğunda direkt olarak login formunu gizle
-          setShowLoginForm(false);
-          setUsername(session.username);
+        if (validSession) {
+          // Oturum geçerliyse kaydedilmiş kullanıcı adını al
+          const session = getSession();
+          console.log("Retrieved session data:", session ? "Session exists" : "No session data");
           
-          // Check if we're coming directly from login - if so, don't auto-analyze
-          const isNewLogin = sessionStorage.getItem('freshLogin') === 'true';
+          // Debug bilgisi için session bilgilerini kaydet
+          if (session) {
+            setSessionDebugInfo({
+              username: session.username,
+              tokenExpiry: session.tokenExpiry ? new Date(session.tokenExpiry).toLocaleString() : "N/A",
+              timeRemaining: session.tokenExpiry ? Math.round((session.tokenExpiry - Date.now()) / 1000 / 60) + " minutes" : "N/A",
+              didFormat: session.did ? `${session.did.substring(0, 10)}...${session.did.substring(session.did.length - 5)}` : "N/A"
+            });
+          }
           
-          if (!isNewLogin) {
-            // Only run analysis if not coming from a fresh login
-          setIsLoading(true);
-          try {
-            // Kaydedilmiş oturum ile takipçi analizini yükle
-            console.log("Loading analysis with saved session...");
-            const analysisResult = await analyzeFollowers(session.username);
-            setFollowersData(analysisResult);
-            console.log("Analysis loaded successfully with saved session");
-          } catch (err) {
-            console.error("Failed to load analysis with saved session:", err);
-            setError(err instanceof Error ? err.message : 'Failed to load saved session data');
-          } finally {
-            setIsLoading(false);
+          if (session) {
+            // Oturum geçerli olduğunda direkt olarak login formunu gizle
+            setShowLoginForm(false);
+            setUsername(session.username);
+            
+            // Check if we're coming directly from login - if so, don't auto-analyze
+            const isNewLogin = sessionStorage.getItem('freshLogin') === 'true';
+            
+            if (!isNewLogin) {
+              // Only run analysis if not coming from a fresh login
+              setIsLoading(true);
+              
+              try {
+                // Kaydedilmiş oturum ile takipçi analizini yükle
+                console.log("Loading analysis with saved session...");
+                // Önce analizin sonuçlarını temizle
+                setFollowersData(null);
+                
+                // Progressive analiz kullanarak daha güvenilir veri alımı
+                const { result } = await analyzeFollowersProgressive(session.username, {
+                  onProgress: (progress) => {
+                    setFetchProgress({
+                      followersProgress: { 
+                        fetched: progress.loadedFollowers, 
+                        total: progress.totalFollowersEstimate 
+                      },
+                      followingProgress: { 
+                        fetched: progress.loadedFollowing, 
+                        total: progress.totalFollowingEstimate 
+                      },
+                      analysisProgress: progress.isComplete ? 100 : 
+                        Math.round(((progress.loadedFollowers / Math.max(1, progress.totalFollowersEstimate)) * 50) + 
+                        ((progress.loadedFollowing / Math.max(1, progress.totalFollowingEstimate)) * 50))
+                    });
+                  }
+                });
+                
+                if (result) {
+                  console.log("Analysis completed successfully");
+                  setFollowersData(result);
+                } else {
+                  console.error("Analysis returned no results");
+                  setError("No analysis results were returned. Please try again.");
+                }
+              } catch (err) {
+                console.error("Failed to load analysis with saved session:", err);
+                setError(err instanceof Error ? err.message : 'Failed to load saved session data');
+              } finally {
+                setIsLoading(false);
+              }
+            } else {
+              // Clear the freshLogin flag
+              sessionStorage.removeItem('freshLogin');
             }
-          } else {
-            // Clear the freshLogin flag
-            sessionStorage.removeItem('freshLogin');
           }
         }
+      } catch (err) {
+        console.error("Session validation error:", err);
+        setError("Session validation failed. Please log in again.");
+        clearSession();
+      } finally {
+        // Session kontrolü tamamlandı, loading'i kaldır
+        setInitialLoading(false);
       }
-      
-      // Session kontrolü tamamlandı, loading'i kaldır
-      setInitialLoading(false);
     };
 
     checkSession();
@@ -233,99 +266,90 @@ const FollowerAnalysis: React.FC = () => {
       }
     }
 
-    setIsLoading(true);
+    // Analiz başlatmadan önce mevcut verileri temizle
+    setFollowersData(null);
     setError(null);
+    setIsLoading(true);
+    // Paralel veri çekme durumunu başlat
+    setIsParallelFetching(true); 
+    
+    // Analiz ilerlemesini sıfırla
+    setFetchProgress({
+      followersProgress: { fetched: 0, total: 0 }, // Başlangıçta 0
+      followingProgress: { fetched: 0, total: 0 }, // Başlangıçta 0
+      analysisProgress: 0
+    });
+    setCacheInfo(null); // Önbellek bilgisini temizle
     
     try {
+      let authResponse: AuthResponse | null = null;
+      
       // Authenticate user if password provided
       if (password) {
         try {
           console.log("Authenticating user:", formattedUsername);
-          const authResponse = await authenticateUser(formattedUsername, password);
+          authResponse = await authenticateUser(formattedUsername, password);
           console.log("Authentication successful, saving session");
           
-          const tokenExpiry = Date.now() + 2 * 60 * 60 * 1000; // 2 hours
-          setSessionDebugInfo({
-            username: formattedUsername,
-            tokenExpiry: new Date(tokenExpiry).toLocaleString(),
-            timeRemaining: "120 minutes (fresh)",
-            didFormat: authResponse.did ? `${authResponse.did.substring(0, 10)}...${authResponse.did.substring(authResponse.did.length - 5)}` : "N/A"
-          });
-          
+          // Oturum bilgilerini kaydet
           saveSession(formattedUsername, authResponse);
-          
-          // Just hide the login form and show the UI in its initial state
-          // Do NOT start analysis here
           setShowLoginForm(false);
-          setIsLoading(false);
           
-          // Return early - don't continue to analysis
-          return;
+          // Taze login olduğunu işaretle (oturum kontrolünde kullanılmayacak ama kalsın)
+          sessionStorage.setItem('freshLogin', 'true');
         } catch (authError) {
-          console.error('Authentication error:', authError);
-          setError('Authentication failed. Please check your username and password.');
+          console.error("Authentication failed:", authError);
+          setError("Authentication failed. Please check your credentials and try again.");
           setIsLoading(false);
+          setIsParallelFetching(false);
           return;
         }
       }
+      
+      console.log("Starting PARALLEL follower/following fetch...");
+      
+      // Paralel olarak takipçi ve takip edilenleri çek
+      // Not: İlerleme takibi için fonksiyonlar güncellenmeli
+      const [followers, following] = await Promise.all([
+        getAllFollowers(formattedUsername), 
+        getAllFollowing(formattedUsername)
+      ]);
 
-      // If we reach here, it's a username-only analysis without password
-      setIsParallelFetching(true);
-      setCacheInfo(null);
+      // Veri çekme tamamlandı, ilerlemeyi güncelle
+      // Gerçek ilerleme takibi için API fonksiyonları güncellenmeli
+      // Şimdilik basitçe %100 yapalım
+      setFetchProgress(prev => ({
+        ...prev,
+        followersProgress: { fetched: followers.length, total: followers.length }, 
+        followingProgress: { fetched: following.length, total: following.length }, 
+      }));
       
-      // Reset progress state
-      setFetchProgress({
-        followersProgress: { fetched: 0, total: 0 },
-        followingProgress: { fetched: 0, total: 0 },
-        analysisProgress: 0
-      });
+      console.log(`Fetched ${followers.length} followers and ${following.length} following.`);
+      
+      // Verileri analiz et
+      console.log("Analyzing fetched data...");
+      setFetchProgress(prev => ({ ...prev, analysisProgress: 50 })); // Analiz başladı
+      const analysisResult = analyzeFollowersData(followers, following);
+      setFetchProgress(prev => ({ ...prev, analysisProgress: 100 })); // Analiz bitti
 
-      // Use the parallel fetching function with progress callback and caching
-      const analysisResponse = await analyzeFollowersProgressive(
-        formattedUsername,
-        {
-          onProgress: (progress) => {
-            setFetchProgress({
-              followersProgress: { 
-                fetched: progress.loadedFollowers, 
-                total: progress.totalFollowersEstimate 
-              },
-              followingProgress: { 
-                fetched: progress.loadedFollowing, 
-                total: progress.totalFollowingEstimate 
-              },
-              analysisProgress: progress.isComplete ? 100 : Math.round(
-                ((progress.loadedFollowers / Math.max(1, progress.totalFollowersEstimate)) + 
-                (progress.loadedFollowing / Math.max(1, progress.totalFollowingEstimate))) * 50
-              )
-            });
-          }
-        }
-      );
+      console.log("Analysis complete, setting results");
+      setFollowersData(analysisResult);
       
-      // Extract the result from the response
-      const analysisResult = analysisResponse.result;
-      
-      // Check if data was from cache
-      if (fetchProgress.analysisProgress === 100 && fetchProgress.followersProgress.fetched > 0) {
-        // Data was loaded from cache
-        const cachedData = await getAnalysisResults(formattedUsername);
-        if (cachedData) {
-          const now = Date.now();
-          const age = formatTimeAgo(now - cachedData.timestamp);
-          setCacheInfo({
-            timestamp: cachedData.timestamp,
-            age
-          });
-        }
+      // Önbelleğe kaydet
+      try {
+        await idb.saveAnalysisResults(formattedUsername, analysisResult);
+        await cacheFollowersData(formattedUsername, followers);
+        await cacheFollowingData(formattedUsername, following);
+      } catch (cacheError) {
+        console.warn("Failed to save analysis results to cache:", cacheError);
       }
       
-      setFollowersData(analysisResult);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to analyze followers');
+    } catch (analysisError) {
+      console.error("Error during analysis:", analysisError);
+      setError(analysisError instanceof Error ? analysisError.message : "Analysis failed. Please try again.");
     } finally {
       setIsLoading(false);
-      setIsParallelFetching(false);
+      setIsParallelFetching(false); // Paralel veri çekme bitti
     }
   };
 
@@ -1583,106 +1607,6 @@ const FollowerAnalysis: React.FC = () => {
     );
   };
 
-  {!showLoginForm && !followersData && !isParallelFetching && (
-    <Card className="mb-8">
-      <div className="text-center p-6">
-        <h3 className="text-xl font-bold mb-4 text-gray-800 dark:text-white">
-          {t.welcomeMessage} @{username.split('.')[0]}
-        </h3>
-        
-        <p className="mb-6 text-gray-600 dark:text-gray-400">
-          {language === 'TR' 
-            ? 'Takipçi analizini başlatmak için lütfen aşağıdaki butona tıklayın.' 
-            : 'Click the button below to start analyzing your followers.'}
-        </p>
-        
-        <div className="flex justify-center">
-          <Button
-            onClick={() => {
-              setIsLoading(true);
-              setIsParallelFetching(true);
-              setCacheInfo(null);
-              
-              // Reset progress state
-              setFetchProgress({
-                followersProgress: { fetched: 0, total: 0 },
-                followingProgress: { fetched: 0, total: 0 },
-                analysisProgress: 0
-              });
-              
-              // Start the analysis
-              analyzeFollowersProgressive(
-                username,
-                {
-                  onProgress: (progress) => {
-                    setFetchProgress({
-                      followersProgress: { 
-                        fetched: progress.loadedFollowers, 
-                        total: progress.totalFollowersEstimate 
-                      },
-                      followingProgress: { 
-                        fetched: progress.loadedFollowing, 
-                        total: progress.totalFollowingEstimate 
-                      },
-                      analysisProgress: progress.isComplete ? 100 : Math.round(
-                        ((progress.loadedFollowers / Math.max(1, progress.totalFollowersEstimate)) + 
-                        (progress.loadedFollowing / Math.max(1, progress.totalFollowingEstimate))) * 50
-                      )
-                    });
-                  }
-                }
-              )
-              .then(analysisResponse => {
-                // Extract the result from the response
-                const analysisResult = analysisResponse.result;
-                
-                // Check if data was from cache
-                if (fetchProgress.analysisProgress === 100 && fetchProgress.followersProgress.fetched > 0) {
-                  // Data was loaded from cache
-                  getAnalysisResults(username).then(cachedData => {
-                    if (cachedData) {
-                      const now = Date.now();
-                      const age = formatTimeAgo(now - cachedData.timestamp);
-                      setCacheInfo({
-                        timestamp: cachedData.timestamp,
-                        age
-                      });
-                    }
-                  });
-                }
-                
-                setFollowersData(analysisResult);
-                setIsLoading(false);
-                setIsParallelFetching(false);
-              })
-              .catch(err => {
-                setError(err instanceof Error ? err.message : 'Failed to analyze followers');
-                setIsLoading(false);
-                setIsParallelFetching(false);
-              });
-            }}
-            size="lg"
-            isLoading={isLoading}
-          >
-            {isLoading ? t.loading : (language === 'TR' ? 'Analizi Başlat' : 'Start Analysis')}
-          </Button>
-        </div>
-      </div>
-    </Card>
-  )}
-
-  {!showLoginForm && (
-    <div className="mb-4 flex justify-end">
-      <Button
-        onClick={handleNewSearch}
-        variant="outline"
-        size="sm"
-      >
-        {t.newSearch}
-      </Button>
-    </div>
-  )}
-
   return (
     <div className="relative">
       <div className="w-full max-w-4xl mx-auto p-4">
@@ -1749,94 +1673,6 @@ const FollowerAnalysis: React.FC = () => {
                     )}
                   </div>
                 </form>
-              </Card>
-            )}
-
-            {!showLoginForm && !followersData && !isParallelFetching && (
-              <Card className="mb-8">
-                <div className="text-center p-6">
-                  <h3 className="text-xl font-bold mb-4 text-gray-800 dark:text-white">
-                    {language === 'TR' ? 'Hoş geldiniz' : 'Welcome'} @{username.split('.')[0]}
-                  </h3>
-                  
-                  <p className="mb-6 text-gray-600 dark:text-gray-400">
-                    {language === 'TR' 
-                      ? 'Takipçi analizini başlatmak için lütfen aşağıdaki butona tıklayın.' 
-                      : 'Click the button below to start analyzing your followers.'}
-                  </p>
-                  
-                  <div className="flex justify-center">
-                    <Button
-                      onClick={() => {
-                        setIsLoading(true);
-                        setIsParallelFetching(true);
-                        setCacheInfo(null);
-                        
-                        // Reset progress state
-                        setFetchProgress({
-                          followersProgress: { fetched: 0, total: 0 },
-                          followingProgress: { fetched: 0, total: 0 },
-                          analysisProgress: 0
-                        });
-                        
-                        // Start the analysis
-                        analyzeFollowersProgressive(
-                          username,
-                          {
-                            onProgress: (progress) => {
-                              setFetchProgress({
-                                followersProgress: { 
-                                  fetched: progress.loadedFollowers, 
-                                  total: progress.totalFollowersEstimate 
-                                },
-                                followingProgress: { 
-                                  fetched: progress.loadedFollowing, 
-                                  total: progress.totalFollowingEstimate 
-                                },
-                                analysisProgress: progress.isComplete ? 100 : Math.round(
-                                  ((progress.loadedFollowers / Math.max(1, progress.totalFollowersEstimate)) + 
-                                  (progress.loadedFollowing / Math.max(1, progress.totalFollowingEstimate))) * 50
-                                )
-                              });
-                            }
-                          }
-                        )
-                        .then(analysisResponse => {
-                          // Extract the result from the response
-                          const analysisResult = analysisResponse.result;
-                          
-                          // Check if data was from cache
-                          if (fetchProgress.analysisProgress === 100 && fetchProgress.followersProgress.fetched > 0) {
-                            // Data was loaded from cache
-                            getAnalysisResults(username).then(cachedData => {
-                              if (cachedData) {
-                                const now = Date.now();
-                                const age = formatTimeAgo(now - cachedData.timestamp);
-                                setCacheInfo({
-                                  timestamp: cachedData.timestamp,
-                                  age
-                                });
-                              }
-                            });
-                          }
-                          
-                          setFollowersData(analysisResult);
-                          setIsLoading(false);
-                          setIsParallelFetching(false);
-                        })
-                        .catch(err => {
-                          setError(err instanceof Error ? err.message : 'Failed to analyze followers');
-                          setIsLoading(false);
-                          setIsParallelFetching(false);
-                        });
-                      }}
-                      size="lg"
-                      isLoading={isLoading}
-                    >
-                      {isLoading ? t.loading : (language === 'TR' ? 'Analizi Başlat' : 'Start Analysis')}
-                    </Button>
-                  </div>
-                </div>
               </Card>
             )}
 

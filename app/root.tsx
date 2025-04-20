@@ -67,7 +67,7 @@ function LayoutWithLanguage({ children }: { children: React.ReactNode }) {
         <meta name="revisit-after" content="7 days" />
         <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
         <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
-        <meta http-equiv="content-language" content={language === 'EN' ? 'en' : 'tr'} />
+        <meta httpEquiv="content-language" content={language === 'EN' ? 'en' : 'tr'} />
         {/* Open Graph / Facebook */}
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://blue-analyze.com/" />

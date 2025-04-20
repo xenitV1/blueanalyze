@@ -88,35 +88,62 @@ export const getSession = (): { username: string, accessJwt: string, refreshJwt:
  * Geçerliyse kaydedilmiş tokenları döndürür, değilse refresh token ile yeni token alır
  */
 export const validateSession = async (): Promise<{ accessJwt: string, did: string } | null> => {
-  const session = getSession();
-  if (!session) return null;
-
-  // Token hala geçerliyse (15 dakikadan fazla kalmışsa) doğrudan döndür
-  if (Date.now() < session.tokenExpiry - 15 * 60 * 1000) {
-    return {
-      accessJwt: session.accessJwt,
-      did: session.did
-    };
-  }
-
-  // Token geçersizse veya yakında sona erecekse yenile
   try {
-    const refreshedSession = await refreshSession(session.refreshJwt);
-    if (refreshedSession) {
-      // Yeni oturum bilgilerini kaydet ve güncellenen tokenları döndür
-      saveSession(session.username, refreshedSession);
+    const session = getSession();
+    if (!session) {
+      console.log('Kaydedilmiş oturum bulunamadı');
+      return null;
+    }
+
+    // Access token'in durumunu kontrol et
+    const accessTokenRemainingTime = getTokenAge(session.accessJwt);
+    console.log(`Access token kalan süresi: ${Math.round(accessTokenRemainingTime / 1000 / 60)} dakika`);
+
+    // Token hala geçerliyse (15 dakikadan fazla kalmışsa) doğrudan döndür
+    if (Date.now() < session.tokenExpiry - 15 * 60 * 1000 && accessTokenRemainingTime > 15 * 60 * 1000) {
+      console.log('Mevcut token hala geçerli, doğrudan kullanılıyor');
       return {
-        accessJwt: refreshedSession.accessJwt,
-        did: refreshedSession.did
+        accessJwt: session.accessJwt,
+        did: session.did
       };
     }
-  } catch (error) {
-    console.error('Token yenilenirken hata oluştu:', error);
-    // Refresh token da geçersiz olabilir, oturumu tamamen temizle
-    clearSession();
-  }
 
-  return null;
+    console.log('Token yenileme gerekiyor...');
+    
+    // Refresh token'ın geçerli olup olmadığını kontrol et
+    if (!session.refreshJwt || session.refreshJwt.trim() === '') {
+      console.error('Refresh token bulunamadı veya geçersiz');
+      clearSession();
+      return null;
+    }
+
+    // Token geçersizse veya yakında sona erecekse yenile
+    try {
+      const refreshedSession = await refreshSession(session.refreshJwt);
+      if (refreshedSession && refreshedSession.accessJwt) {
+        // Yeni oturum bilgilerini kaydet ve güncellenen tokenları döndür
+        console.log('Token yenileme başarılı, yeni session kaydediliyor');
+        saveSession(session.username, refreshedSession);
+        return {
+          accessJwt: refreshedSession.accessJwt,
+          did: refreshedSession.did
+        };
+      } else {
+        console.error('Token yenileme başarısız: Geçerli yanıt alınamadı');
+        clearSession();
+        return null;
+      }
+    } catch (refreshError) {
+      console.error('Token yenileme işlemi başarısız:', refreshError);
+      // Refresh token da geçersiz olabilir, oturumu tamamen temizle
+      clearSession();
+      return null;
+    }
+  } catch (error) {
+    console.error('Oturum doğrulama hatası:', error);
+    clearSession();
+    return null;
+  }
 };
 
 /**
@@ -135,6 +162,14 @@ export const clearSession = () => {
  */
 export const refreshSession = async (refreshJwt: string): Promise<AuthResponse | null> => {
   try {
+    // Token geçerliliğini kontrol et
+    if (!refreshJwt || refreshJwt.trim() === '') {
+      console.error('Refresh token boş veya geçersiz');
+      return null;
+    }
+
+    console.log(`Oturum yenilenmeye çalışılıyor... Token uzunluğu: ${refreshJwt.length}`);
+    
     const response = await axios.post(`${AUTH_URL}/xrpc/com.atproto.server.refreshSession`, 
       {}, // Body boş olabilir çünkü token header'da gönderiliyor
       {
@@ -144,9 +179,27 @@ export const refreshSession = async (refreshJwt: string): Promise<AuthResponse |
       }
     );
 
-    return response.data;
-  } catch (error) {
-    console.error('Session yenileme hatası:', error);
+    if (response.data && response.data.accessJwt) {
+      console.log('Oturum yenileme başarılı');
+      return response.data;
+    } else {
+      console.error('Oturum yenileme başarısız: Geçerli yanıt alınamadı', response.data);
+      return null;
+    }
+  } catch (error: any) {
+    if (error.response) {
+      // Sunucu yanıtı ile dönen hatalar (400, 401 vb.)
+      console.error(`Session yenileme hatası: ${error.response.status} - ${error.response.statusText}`, error.response.data);
+    } else if (error.request) {
+      // İstek yapıldı ancak yanıt alınamadı
+      console.error('Session yenileme hatası: Sunucudan yanıt alınamadı', error.request);
+    } else {
+      // İstek oluşturulurken bir hata oluştu
+      console.error('Session yenileme hatası:', error.message);
+    }
+    
+    // Oturum geçersiz olduğu için temizle
+    clearSession();
     return null;
   }
 };
@@ -2721,23 +2774,43 @@ export const unfollowUser = async (
 /**
  * Analiz önbelleğini temizler ve yeni bir analiz yapılmasını sağlar
  */
-export const invalidateAnalysisCache = (handle: string): void => {
+export const invalidateAnalysisCache = (handle: string = ""): void => {
   try {
-    // Önbellek anahtarlarını temizle
-    localStorage.removeItem(`blueAnalyze_followers_${handle}`);
-    localStorage.removeItem(`blueAnalyze_following_${handle}`);
+    // Handle belirtilmişse o kullanıcıya özel verileri temizle
+    if (handle) {
+      // Önbellek anahtarlarını temizle
+      localStorage.removeItem(`blueAnalyze_followers_${handle}`);
+      localStorage.removeItem(`blueAnalyze_following_${handle}`);
     
-    // ApiCache içindeki analiz ile ilgili tüm verileri temizle
-    if (apiCache) {
-      const cacheKeys = apiCache.keys();
-      cacheKeys.forEach(key => {
-        if (key.includes(handle) || key.includes('analysis')) {
-          apiCache.delete(key);
-        }
+      // ApiCache içindeki analiz ile ilgili tüm verileri temizle
+      if (apiCache) {
+        const cacheKeys = apiCache.keys();
+        cacheKeys.forEach(key => {
+          if (key.includes(handle) || key.includes('analysis')) {
+            apiCache.delete(key);
+          }
+        });
+      }
+      
+      console.log(`Analysis cache for ${handle} has been invalidated`);
+    } 
+    // Handle belirtilmemişse tüm önbelleği temizle
+    else {
+      // Tüm localStorage verilerini temizleme seçeneği
+      const allKeys = Object.keys(localStorage);
+      const blueAnalyzeKeys = allKeys.filter(key => key.startsWith('blueAnalyze_'));
+      
+      blueAnalyzeKeys.forEach(key => {
+        localStorage.removeItem(key);
       });
+      
+      // ApiCache'i tamamen temizle
+      if (apiCache) {
+        apiCache.clear();
+      }
+      
+      console.log('All analysis cache has been invalidated');
     }
-    
-    console.log(`Analysis cache for ${handle} has been invalidated`);
   } catch (error) {
     console.error('Error invalidating analysis cache:', error);
   }

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useOperation } from '../../contexts/OperationContext';
 import { clearAllCache } from '../../services/indexedDBService';
+import { clearSession, invalidateAnalysisCache } from '../../services/blueskyAPI';
 
 const NavBar: React.FC = () => {
   const { language, setLanguage, t } = useLanguage();
@@ -24,13 +25,26 @@ const NavBar: React.FC = () => {
   // Clear all cache function
   const handleClearCache = async () => {
     try {
+      // Tüm önbelleği ve veritabanı kayıtlarını temizle
       await clearAllCache();
+      
+      // blueskyAPI'den oturum bilgilerini temizle
+      clearSession();
+      
+      // Tüm analiz önbelleğini temizle
+      invalidateAnalysisCache();
+      
+      // SessionStorage'ı da temizle
+      if (typeof window !== 'undefined') {
+        sessionStorage.clear();
+      }
+      
       setCacheCleared(true);
       
-      // Reset status after 3 seconds
+      // Kısa bir süre sonra sayfayı yeniden yükle
       setTimeout(() => {
-        setCacheCleared(false);
-      }, 3000);
+        window.location.reload();
+      }, 1000);
     } catch (error) {
       console.error('Failed to clear cache:', error);
     }

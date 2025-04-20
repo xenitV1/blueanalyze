@@ -455,9 +455,8 @@ export const clearAnalysisResults = async (username: string): Promise<void> => {
 };
 
 /**
- * Clear all cache data except authentication
- * This function cleans all data in ANALYSIS_STORE, PROGRESS_STORE, and unnecessary PREFERENCES_STORE items
- * Authentication data is preserved to keep the user logged in
+ * Clear all cache data including authentication
+ * This function cleans all data in ALL stores including AUTH_STORE
  */
 export const clearAllCache = async (): Promise<void> => {
   try {
@@ -469,8 +468,11 @@ export const clearAllCache = async (): Promise<void> => {
     // Clear Progress Store
     await clearAllStoreItems(db, PROGRESS_STORE);
     
-    // Only clear specific preference items if needed (keep language settings)
-    // If you have specific preferences to keep, handle them here
+    // Clear Auth Store
+    await clearAllStoreItems(db, AUTH_STORE);
+    
+    // Clear Preferences Store (if needed)
+    // await clearAllStoreItems(db, PREFERENCES_STORE);
     
     console.log('All cache data cleared successfully');
   } catch (error) {
