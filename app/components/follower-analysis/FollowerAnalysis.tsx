@@ -138,18 +138,18 @@ const FollowerAnalysis: React.FC = () => {
           
           if (!isNewLogin) {
             // Only run analysis if not coming from a fresh login
-            setIsLoading(true);
-            try {
-              // Kaydedilmiş oturum ile takipçi analizini yükle
-              console.log("Loading analysis with saved session...");
-              const analysisResult = await analyzeFollowers(session.username);
-              setFollowersData(analysisResult);
-              console.log("Analysis loaded successfully with saved session");
-            } catch (err) {
-              console.error("Failed to load analysis with saved session:", err);
-              setError(err instanceof Error ? err.message : 'Failed to load saved session data');
-            } finally {
-              setIsLoading(false);
+          setIsLoading(true);
+          try {
+            // Kaydedilmiş oturum ile takipçi analizini yükle
+            console.log("Loading analysis with saved session...");
+            const analysisResult = await analyzeFollowers(session.username);
+            setFollowersData(analysisResult);
+            console.log("Analysis loaded successfully with saved session");
+          } catch (err) {
+            console.error("Failed to load analysis with saved session:", err);
+            setError(err instanceof Error ? err.message : 'Failed to load saved session data');
+          } finally {
+            setIsLoading(false);
             }
           } else {
             // Clear the freshLogin flag
@@ -234,17 +234,8 @@ const FollowerAnalysis: React.FC = () => {
     }
 
     setIsLoading(true);
-    setIsParallelFetching(true);
     setError(null);
-    setCacheInfo(null);
     
-    // Reset progress state
-    setFetchProgress({
-      followersProgress: { fetched: 0, total: 0 },
-      followingProgress: { fetched: 0, total: 0 },
-      analysisProgress: 0
-    });
-
     try {
       // Authenticate user if password provided
       if (password) {
@@ -263,12 +254,31 @@ const FollowerAnalysis: React.FC = () => {
           
           saveSession(formattedUsername, authResponse);
           
-          // Set freshLogin flag in sessionStorage
-          sessionStorage.setItem('freshLogin', 'true');
+          // Just hide the login form and show the UI in its initial state
+          // Do NOT start analysis here
+          setShowLoginForm(false);
+          setIsLoading(false);
+          
+          // Return early - don't continue to analysis
+          return;
         } catch (authError) {
           console.error('Authentication error:', authError);
+          setError('Authentication failed. Please check your username and password.');
+          setIsLoading(false);
+          return;
         }
       }
+
+      // If we reach here, it's a username-only analysis without password
+      setIsParallelFetching(true);
+      setCacheInfo(null);
+      
+      // Reset progress state
+      setFetchProgress({
+        followersProgress: { fetched: 0, total: 0 },
+        followingProgress: { fetched: 0, total: 0 },
+        analysisProgress: 0
+      });
 
       // Use the parallel fetching function with progress callback and caching
       const analysisResponse = await analyzeFollowersProgressive(
@@ -1573,6 +1583,106 @@ const FollowerAnalysis: React.FC = () => {
     );
   };
 
+  {!showLoginForm && !followersData && !isParallelFetching && (
+    <Card className="mb-8">
+      <div className="text-center p-6">
+        <h3 className="text-xl font-bold mb-4 text-gray-800 dark:text-white">
+          {t.welcomeMessage} @{username.split('.')[0]}
+        </h3>
+        
+        <p className="mb-6 text-gray-600 dark:text-gray-400">
+          {language === 'TR' 
+            ? 'Takipçi analizini başlatmak için lütfen aşağıdaki butona tıklayın.' 
+            : 'Click the button below to start analyzing your followers.'}
+        </p>
+        
+        <div className="flex justify-center">
+          <Button
+            onClick={() => {
+              setIsLoading(true);
+              setIsParallelFetching(true);
+              setCacheInfo(null);
+              
+              // Reset progress state
+              setFetchProgress({
+                followersProgress: { fetched: 0, total: 0 },
+                followingProgress: { fetched: 0, total: 0 },
+                analysisProgress: 0
+              });
+              
+              // Start the analysis
+              analyzeFollowersProgressive(
+                username,
+                {
+                  onProgress: (progress) => {
+                    setFetchProgress({
+                      followersProgress: { 
+                        fetched: progress.loadedFollowers, 
+                        total: progress.totalFollowersEstimate 
+                      },
+                      followingProgress: { 
+                        fetched: progress.loadedFollowing, 
+                        total: progress.totalFollowingEstimate 
+                      },
+                      analysisProgress: progress.isComplete ? 100 : Math.round(
+                        ((progress.loadedFollowers / Math.max(1, progress.totalFollowersEstimate)) + 
+                        (progress.loadedFollowing / Math.max(1, progress.totalFollowingEstimate))) * 50
+                      )
+                    });
+                  }
+                }
+              )
+              .then(analysisResponse => {
+                // Extract the result from the response
+                const analysisResult = analysisResponse.result;
+                
+                // Check if data was from cache
+                if (fetchProgress.analysisProgress === 100 && fetchProgress.followersProgress.fetched > 0) {
+                  // Data was loaded from cache
+                  getAnalysisResults(username).then(cachedData => {
+                    if (cachedData) {
+                      const now = Date.now();
+                      const age = formatTimeAgo(now - cachedData.timestamp);
+                      setCacheInfo({
+                        timestamp: cachedData.timestamp,
+                        age
+                      });
+                    }
+                  });
+                }
+                
+                setFollowersData(analysisResult);
+                setIsLoading(false);
+                setIsParallelFetching(false);
+              })
+              .catch(err => {
+                setError(err instanceof Error ? err.message : 'Failed to analyze followers');
+                setIsLoading(false);
+                setIsParallelFetching(false);
+              });
+            }}
+            size="lg"
+            isLoading={isLoading}
+          >
+            {isLoading ? t.loading : (language === 'TR' ? 'Analizi Başlat' : 'Start Analysis')}
+          </Button>
+        </div>
+      </div>
+    </Card>
+  )}
+
+  {!showLoginForm && (
+    <div className="mb-4 flex justify-end">
+      <Button
+        onClick={handleNewSearch}
+        variant="outline"
+        size="sm"
+      >
+        {t.newSearch}
+      </Button>
+    </div>
+  )}
+
   return (
     <div className="relative">
       <div className="w-full max-w-4xl mx-auto p-4">
@@ -1639,6 +1749,94 @@ const FollowerAnalysis: React.FC = () => {
                     )}
                   </div>
                 </form>
+              </Card>
+            )}
+
+            {!showLoginForm && !followersData && !isParallelFetching && (
+              <Card className="mb-8">
+                <div className="text-center p-6">
+                  <h3 className="text-xl font-bold mb-4 text-gray-800 dark:text-white">
+                    {language === 'TR' ? 'Hoş geldiniz' : 'Welcome'} @{username.split('.')[0]}
+                  </h3>
+                  
+                  <p className="mb-6 text-gray-600 dark:text-gray-400">
+                    {language === 'TR' 
+                      ? 'Takipçi analizini başlatmak için lütfen aşağıdaki butona tıklayın.' 
+                      : 'Click the button below to start analyzing your followers.'}
+                  </p>
+                  
+                  <div className="flex justify-center">
+                    <Button
+                      onClick={() => {
+                        setIsLoading(true);
+                        setIsParallelFetching(true);
+                        setCacheInfo(null);
+                        
+                        // Reset progress state
+                        setFetchProgress({
+                          followersProgress: { fetched: 0, total: 0 },
+                          followingProgress: { fetched: 0, total: 0 },
+                          analysisProgress: 0
+                        });
+                        
+                        // Start the analysis
+                        analyzeFollowersProgressive(
+                          username,
+                          {
+                            onProgress: (progress) => {
+                              setFetchProgress({
+                                followersProgress: { 
+                                  fetched: progress.loadedFollowers, 
+                                  total: progress.totalFollowersEstimate 
+                                },
+                                followingProgress: { 
+                                  fetched: progress.loadedFollowing, 
+                                  total: progress.totalFollowingEstimate 
+                                },
+                                analysisProgress: progress.isComplete ? 100 : Math.round(
+                                  ((progress.loadedFollowers / Math.max(1, progress.totalFollowersEstimate)) + 
+                                  (progress.loadedFollowing / Math.max(1, progress.totalFollowingEstimate))) * 50
+                                )
+                              });
+                            }
+                          }
+                        )
+                        .then(analysisResponse => {
+                          // Extract the result from the response
+                          const analysisResult = analysisResponse.result;
+                          
+                          // Check if data was from cache
+                          if (fetchProgress.analysisProgress === 100 && fetchProgress.followersProgress.fetched > 0) {
+                            // Data was loaded from cache
+                            getAnalysisResults(username).then(cachedData => {
+                              if (cachedData) {
+                                const now = Date.now();
+                                const age = formatTimeAgo(now - cachedData.timestamp);
+                                setCacheInfo({
+                                  timestamp: cachedData.timestamp,
+                                  age
+                                });
+                              }
+                            });
+                          }
+                          
+                          setFollowersData(analysisResult);
+                          setIsLoading(false);
+                          setIsParallelFetching(false);
+                        })
+                        .catch(err => {
+                          setError(err instanceof Error ? err.message : 'Failed to analyze followers');
+                          setIsLoading(false);
+                          setIsParallelFetching(false);
+                        });
+                      }}
+                      size="lg"
+                      isLoading={isLoading}
+                    >
+                      {isLoading ? t.loading : (language === 'TR' ? 'Analizi Başlat' : 'Start Analysis')}
+                    </Button>
+                  </div>
+                </div>
               </Card>
             )}
 
