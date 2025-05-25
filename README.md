@@ -136,9 +136,7 @@ netlify deploy --prod
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 👨‍💻 Contributors
-
-- [vortic0](https://bsky.app/profile/vortic0.bsky.social) - Developer
-
+xenit
 ## 📧 Contact
 
 For questions or suggestions, you can reach out via [GitHub Issues](https://github.com/vortic-0/blueanalyze/issues).
