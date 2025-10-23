@@ -238,13 +238,13 @@ const Footer: React.FC = () => {
             <FiExternalLink className="text-blue-500 mr-3 flex-shrink-0" />
             <div>
               <p className="font-medium">{t.connectOn}</p>
-              <a 
-                href="https://bsky.app/profile/vortic0.bsky.social"
+              <a
+                href="https://x.com/xenit_v0"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-600 dark:text-blue-400 hover:underline"
               >
-                @vortic0.bsky.social
+                @https://x.com/xenit_v0
               </a>
             </div>
           </div>

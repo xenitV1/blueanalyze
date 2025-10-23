@@ -2337,13 +2337,13 @@ const FollowerAnalysis: React.FC = () => {
               
               <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">
                 Built with 💙 by{" "}
-                <a 
-                  href="https://bsky.app/profile/vortic0.bsky.social" 
-                  target="_blank" 
+                <a
+                  href="https://x.com/xenit_v0"
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 inline-flex items-center"
                 >
-                  vortic0 <FiExternalLink className="ml-1 text-xs" />
+                  @https://x.com/xenit_v0 <FiExternalLink className="ml-1 text-xs" />
                 </a>
               </div>
             </div>
